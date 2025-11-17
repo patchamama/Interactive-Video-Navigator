@@ -522,9 +522,46 @@ Currently: No persistence (resets on page reload)
 
 ---
 
+## Performance Optimizations
+
+### Passive Event Listeners (Added 2025-11-17)
+The application automatically marks scroll-blocking events as passive to improve scrolling performance and eliminate browser warnings.
+
+**Implementation** (lines 737-767):
+```javascript
+// Patches addEventListener to add { passive: true } to:
+// - touchstart, touchmove
+// - wheel, mousewheel
+
+// Before: Browser warning about non-passive listeners
+// After: Smooth scrolling, no warnings
+```
+
+**Why this matters:**
+- Eliminates console warning: `[Violation] Added non-passive event listener to a scroll-blocking event`
+- Improves scroll performance on touch devices
+- Allows browser to optimize scrolling without waiting for `preventDefault()` checks
+- Benefits Bootstrap and other third-party libraries automatically
+
+**Technical details:**
+- Polyfill runs before DOMContentLoaded
+- Patches `EventTarget.prototype.addEventListener` globally
+- Only affects touch and wheel events
+- Preserves explicit `passive: false` if needed
+
 ## Troubleshooting
 
 ### Common Issues
+
+#### Passive Event Listener Warnings
+**Symptoms**: Console warning about non-passive event listeners
+**Fixed**: Automatic passive event listener polyfill (lines 737-767)
+**Status**: Resolved as of 2025-11-17
+
+If you still see warnings:
+- Check browser console for specific event type
+- Verify polyfill is loading (should be before DOMContentLoaded)
+- Check if third-party scripts load before the polyfill
 
 #### Video Not Playing
 **Symptoms**: Video doesn't load or shows errors
@@ -837,7 +874,8 @@ iframe.contentWindow.postMessage(JSON.stringify({
 | Video management | 460-533 |
 | UI rendering | 540-654 |
 | Event handlers | 678-731 |
-| Initialization | 737-757 |
+| Passive listener fix | 737-767 |
+| Initialization | 769-789 |
 
 ### Common Tasks
 ```bash

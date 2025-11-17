@@ -733,7 +733,39 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         // ============================================
         // INITIALIZATION
         // ============================================
-        
+
+        // Fix for passive event listener warning
+        // This improves scroll performance by marking appropriate events as passive
+        (function() {
+            const passiveEvents = ['touchstart', 'touchmove', 'wheel', 'mousewheel'];
+            const originalAddEventListener = EventTarget.prototype.addEventListener;
+
+            EventTarget.prototype.addEventListener = function(type, listener, options) {
+                let usesPassive = false;
+
+                // Check if this is a passive-eligible event
+                if (passiveEvents.includes(type)) {
+                    // If options is a boolean (legacy), convert to object
+                    if (typeof options === 'boolean') {
+                        options = { capture: options, passive: true };
+                        usesPassive = true;
+                    }
+                    // If options is undefined, set passive
+                    else if (!options) {
+                        options = { passive: true };
+                        usesPassive = true;
+                    }
+                    // If options is an object but passive not set, add it
+                    else if (typeof options === 'object' && options.passive === undefined) {
+                        options.passive = true;
+                        usesPassive = true;
+                    }
+                }
+
+                return originalAddEventListener.call(this, type, listener, options);
+            };
+        })();
+
         document.addEventListener('DOMContentLoaded', function() {
             // Set up event listeners
             document.getElementById('loadBtn').addEventListener('click', loadConfiguration);
@@ -743,7 +775,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 const term = document.getElementById('searchInput').value;
                 searchSubtitles(term);
             });
-            
+
             // Allow Enter key for search
             document.getElementById('searchInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
@@ -751,7 +783,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                     searchSubtitles(term);
                 }
             });
-            
+
             // Load default configuration
             resetConfiguration();
         });
