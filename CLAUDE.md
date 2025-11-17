@@ -91,7 +91,7 @@ Interactive-Video-Navigator/
 
 3. **Event-Driven Architecture**
    - DOM event listeners for user interactions
-   - YouTube postMessage API for video control
+   - YouTube IFrame API for video control and time tracking
 
 4. **Functional Programming**
    - Pure utility functions for parsing and formatting
@@ -276,9 +276,10 @@ The application now supports loading and displaying up to **3 simultaneous subti
 
 #### Synchronization
 - **Update frequency**: Every 500ms
-- **YouTube API integration**: Uses `postMessage` to get current playback time
+- **YouTube API integration**: Uses official YouTube IFrame API (`player.getCurrentTime()`)
 - **Smart matching**: Finds subtitle with 2-second time window
 - **Automatic updates**: No manual refresh needed
+- **Chapter tracking**: Also updates active index item synchronously
 
 #### Visibility Controls
 - **Individual checkboxes** for each subtitle track
@@ -342,26 +343,34 @@ let srtData = [];   // Backward compatibility (points to srtData1)
 
 ### Implementation Notes
 
-**YouTube API Message Handling:**
+**YouTube IFrame API Player:**
 ```javascript
-window.addEventListener('message', function(event) {
-    if (event.origin !== 'https://www.youtube.com') return;
-    const data = JSON.parse(event.data);
-    if (data.info && data.info.currentTime) {
-        updateLiveSubtitles(data.info.currentTime);
+// Create YouTube player instance
+player = new YT.Player('ytplayer', {
+    width: '100%',
+    height: '100%',
+    videoId: videoId,
+    playerVars: {
+        'enablejsapi': 1,
+        'rel': 0,
+        'modestbranding': 1
+    },
+    events: {
+        'onReady': onPlayerReady,
+        'onStateChange': onPlayerStateChange
     }
 });
 ```
 
-**Interval Management:**
+**Synchronization Loop:**
 ```javascript
-// Request current time every 500ms
+// Update subtitles and chapter every 500ms
 subtitleSyncInterval = setInterval(() => {
-    iframe.contentWindow.postMessage(JSON.stringify({
-        event: 'command',
-        func: 'getCurrentTime',
-        args: []
-    }), '*');
+    if (player && typeof player.getCurrentTime === 'function') {
+        const currentTime = player.getCurrentTime();
+        updateLiveSubtitles(currentTime);
+        updateActiveItem(currentTime);
+    }
 }, 500);
 ```
 
@@ -788,16 +797,17 @@ If you still see warnings:
 #### Timestamps Not Working
 **Symptoms**: Clicking timestamps doesn't seek video
 **Causes**:
-1. YouTube API not loaded
-2. postMessage blocked
+1. YouTube IFrame API not loaded
+2. Player object not initialized
 3. Invalid timestamp format
-4. iframe not ready
+4. Player not ready
 
 **Solutions**:
 - Check console for YouTube API errors
-- Verify iframe has `enablejsapi=1` parameter
+- Verify `player` object exists in console
 - Check timestamp format (HH:MM:SS)
-- Wait for iframe to fully load
+- Wait for `onPlayerReady` callback
+- Ensure YouTube IFrame API script loaded successfully
 
 #### Index Not Parsing
 **Symptoms**: "No index items found" message
@@ -917,23 +927,36 @@ toggleSection(sectionId: string): void
 seekToTime(seconds: number): void
 ```
 
-### YouTube iframe API Integration
+### YouTube IFrame API Integration
 
 ```javascript
-// Seek command via postMessage
-iframe.contentWindow.postMessage(JSON.stringify({
-    event: 'command',
-    func: 'seekTo',
-    args: [seconds, true]
-}), '*');
+// Load YouTube IFrame API
+const tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+
+// Create player instance
+player = new YT.Player('ytplayer', {
+    videoId: videoId,
+    events: {
+        'onReady': onPlayerReady,
+        'onStateChange': onPlayerStateChange
+    }
+});
+
+// Seek to timestamp
+player.seekTo(seconds, true);
+
+// Get current playback time
+const currentTime = player.getCurrentTime();
 ```
 
 ### Browser APIs Used
 - `FileReader` - For SRT/index file uploads
 - `localStorage` - Not yet implemented (planned)
-- `postMessage` - YouTube iframe control
+- `YT.Player` - YouTube IFrame API for video control
 - `scrollIntoView` - Smooth scrolling
 - `setTimeout` - Debouncing alerts
+- `setInterval` - Subtitle synchronization
 
 ---
 
@@ -1016,17 +1039,21 @@ document.querySelectorAll('.section-header').forEach(h => h.click())
 ### Debugging Video Issues
 
 ```javascript
-// Check YouTube iframe
-const iframe = document.getElementById('ytplayer');
-console.log('Iframe:', iframe);
-console.log('Iframe src:', iframe?.src);
+// Check YouTube player object
+console.log('Player:', player);
+console.log('Player state:', player?.getPlayerState());
+console.log('Current time:', player?.getCurrentTime());
 
-// Test postMessage
-iframe.contentWindow.postMessage(JSON.stringify({
-    event: 'command',
-    func: 'getCurrentTime',
-    args: []
-}), '*');
+// Test player methods
+if (player) {
+    player.seekTo(60);  // Seek to 1:00
+    console.log('Duration:', player.getDuration());
+    console.log('Video ID:', player.getVideoData().video_id);
+}
+
+// Check if YouTube API is loaded
+console.log('YT object:', window.YT);
+console.log('YT.Player:', window.YT?.Player);
 ```
 
 ---
