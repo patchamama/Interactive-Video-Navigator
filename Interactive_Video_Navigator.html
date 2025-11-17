@@ -59,8 +59,12 @@
         body.theater-mode .video-container {
             position: relative;
             top: 0;
-            max-width: 100%;
-            margin: 0 auto;
+            max-width: 75%;
+            margin: 20px auto;
+        }
+
+        body.theater-mode .video-wrapper {
+            padding-bottom: 42.19%; /* 16:9 aspect ratio at 75% width */
         }
 
         body.theater-mode #configPanel,
@@ -481,13 +485,13 @@
                                         </label>
                                     </div>
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="showSub2" checked>
+                                        <input class="form-check-input" type="checkbox" id="showSub2">
                                         <label class="form-check-label" for="showSub2">
                                             <i class="bi bi-eye"></i> Show Subtitle 2
                                         </label>
                                     </div>
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="showSub3" checked>
+                                        <input class="form-check-input" type="checkbox" id="showSub3">
                                         <label class="form-check-label" for="showSub3">
                                             <i class="bi bi-eye"></i> Show Subtitle 3
                                         </label>
@@ -504,7 +508,7 @@
                                 </div>
 
                                 <!-- Search Section -->
-                                <div class="col-12" id="searchSection" style="display:none;">
+                                <div class="col-12" id="searchSection">
                                     <hr class="my-3">
                                     <h6 class="mb-3"><i class="bi bi-search"></i> Search in Subtitles</h6>
                                     <div class="row g-2">
@@ -777,14 +781,15 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             const container = document.getElementById('videoContainer');
             
             // Create iframe
+            const origin = window.location.origin;
             container.innerHTML = `
-                <iframe 
+                <iframe
                     id="ytplayer"
-                    width="100%" 
-                    height="100%" 
-                    src="https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0" 
-                    frameborder="0" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    width="100%"
+                    height="100%"
+                    src="https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${encodeURIComponent(origin)}&rel=0&widgetid=1"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen>
                 </iframe>
             `;
@@ -1101,7 +1106,6 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
                     // Show subtitle options
                     document.getElementById('liveSubtitleOptions').style.display = 'block';
-                    document.getElementById('searchSection').style.display = 'block';
 
                     // Update stats
                     renderIndex();
@@ -1274,12 +1278,18 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
         // Listen for messages from YouTube iframe
         window.addEventListener('message', function(event) {
-            if (event.origin !== 'https://www.youtube.com') return;
+            // Accept messages from YouTube
+            if (event.origin !== 'https://www.youtube.com' && event.origin !== 'https://www.youtube-nocookie.com') return;
 
             try {
-                const data = JSON.parse(event.data);
-                if (data.event === 'infoDelivery' && data.info && data.info.currentTime !== undefined) {
-                    updateLiveSubtitles(data.info.currentTime);
+                // YouTube sends string data
+                if (typeof event.data === 'string') {
+                    const data = JSON.parse(event.data);
+
+                    // Check for time info from YouTube
+                    if (data.info && typeof data.info.currentTime === 'number') {
+                        updateLiveSubtitles(data.info.currentTime);
+                    }
                 }
             } catch (e) {
                 // Ignore parsing errors
