@@ -85,6 +85,28 @@
 
         body.theater-mode #currentChapterDisplay {
             display: block !important;
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10001;
+            max-width: 70%;
+        }
+
+        body.theater-mode .current-chapter-box {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            box-shadow: 0 4px 20px rgba(33, 150, 243, 0.4);
+            border-left: 4px solid #0d47a1;
+            color: white;
+        }
+
+        body.theater-mode .chapter-label {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        body.theater-mode .chapter-text {
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         body.theater-mode .col-lg-5,
@@ -271,43 +293,30 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
 
-        .subtitle-label {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #667eea;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
+        .subtitle-line {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            padding: 4px 0;
+            transition: all 0.3s ease;
         }
 
-        .subtitle-label::before {
-            content: "●";
-            color: #28a745;
-            margin-right: 8px;
-            font-size: 1.2rem;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .subtitle-text {
-            font-size: 1rem;
-            line-height: 1.6;
-            color: #2c3e50;
-            font-weight: 500;
-            min-height: 24px;
-        }
-
-        .subtitle-text:empty::before {
-            content: "Waiting for subtitles...";
+        .subtitle-previous {
             color: #6c757d;
-            font-style: italic;
             opacity: 0.6;
+            font-size: 0.85rem;
+        }
+
+        .subtitle-current {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 1.05rem;
+            padding: 6px 0;
+        }
+
+        .subtitle-next {
+            color: #6c757d;
+            opacity: 0.6;
+            font-size: 0.85rem;
         }
 
         #liveSub1 {
@@ -545,16 +554,19 @@
                             <!-- Live Subtitles Display -->
                             <div id="liveSubtitlesContainer" style="display:none;">
                                 <div class="live-subtitle-box mt-3" id="liveSub1" style="display:none;">
-                                    <div class="subtitle-label">Subtitle 1</div>
-                                    <div class="subtitle-text" id="liveSubText1"></div>
+                                    <div class="subtitle-line subtitle-previous" id="liveSubText1Prev"></div>
+                                    <div class="subtitle-line subtitle-current" id="liveSubText1"></div>
+                                    <div class="subtitle-line subtitle-next" id="liveSubText1Next"></div>
                                 </div>
                                 <div class="live-subtitle-box mt-2" id="liveSub2" style="display:none;">
-                                    <div class="subtitle-label">Subtitle 2</div>
-                                    <div class="subtitle-text" id="liveSubText2"></div>
+                                    <div class="subtitle-line subtitle-previous" id="liveSubText2Prev"></div>
+                                    <div class="subtitle-line subtitle-current" id="liveSubText2"></div>
+                                    <div class="subtitle-line subtitle-next" id="liveSubText2Next"></div>
                                 </div>
                                 <div class="live-subtitle-box mt-2" id="liveSub3" style="display:none;">
-                                    <div class="subtitle-label">Subtitle 3</div>
-                                    <div class="subtitle-text" id="liveSubText3"></div>
+                                    <div class="subtitle-line subtitle-previous" id="liveSubText3Prev"></div>
+                                    <div class="subtitle-line subtitle-current" id="liveSubText3"></div>
+                                    <div class="subtitle-line subtitle-next" id="liveSubText3Next"></div>
                                 </div>
                             </div>
 
@@ -888,19 +900,23 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 item.classList.remove('active');
             });
 
-            const activeItem = indexItems.find(item =>
-                item.type === 'item' && Math.abs(item.time - time) < 5
-            );
+            // Find the last item that has passed (time <= currentTime)
+            // Similar to subtitle algorithm
+            let activeItem = null;
+            for (let i = indexItems.length - 1; i >= 0; i--) {
+                if (indexItems[i].type === 'item' && time >= indexItems[i].time) {
+                    activeItem = indexItems[i];
+                    break;
+                }
+            }
 
             if (activeItem) {
                 const element = document.getElementById(activeItem.id);
                 if (element) {
                     element.classList.add('active');
 
-                    // Update current chapter if in theater mode
-                    if (document.body.classList.contains('theater-mode')) {
-                        updateCurrentChapter();
-                    }
+                    // Update current chapter
+                    updateCurrentChapter();
                 }
             }
         }
@@ -1208,17 +1224,38 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
 
         /**
-         * Get current subtitle text for given time
+         * Get current subtitle with previous and next lines
          */
         function getCurrentSubtitle(srtArray, currentTime) {
-            if (!srtArray || srtArray.length === 0) return '';
+            if (!srtArray || srtArray.length === 0) {
+                return { previous: '', current: '', next: '' };
+            }
 
-            // Find subtitle that matches current time (with 2 second window)
-            const subtitle = srtArray.find(sub => {
-                return currentTime >= sub.time && currentTime < (sub.time + 2);
-            });
+            // Find the index of the subtitle that should be playing now
+            // Use the last subtitle that has passed (time <= currentTime)
+            let currentIndex = -1;
+            for (let i = srtArray.length - 1; i >= 0; i--) {
+                if (currentTime >= srtArray[i].time) {
+                    currentIndex = i;
+                    break;
+                }
+            }
 
-            return subtitle ? subtitle.text : '';
+            // If no subtitle found or we're before the first subtitle
+            if (currentIndex === -1) {
+                return {
+                    previous: '',
+                    current: '',
+                    next: srtArray[0] ? srtArray[0].text : ''
+                };
+            }
+
+            // Get previous, current, and next
+            const previous = currentIndex > 0 ? srtArray[currentIndex - 1].text : '';
+            const current = srtArray[currentIndex].text;
+            const next = currentIndex < srtArray.length - 1 ? srtArray[currentIndex + 1].text : '';
+
+            return { previous, current, next };
         }
 
         /**
@@ -1227,20 +1264,26 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         function updateLiveSubtitles(currentTime) {
             // Update subtitle 1
             if (srtData1.length > 0 && document.getElementById('showSub1').checked) {
-                const text = getCurrentSubtitle(srtData1, currentTime);
-                document.getElementById('liveSubText1').textContent = text;
+                const lines = getCurrentSubtitle(srtData1, currentTime);
+                document.getElementById('liveSubText1Prev').textContent = lines.previous;
+                document.getElementById('liveSubText1').textContent = lines.current;
+                document.getElementById('liveSubText1Next').textContent = lines.next;
             }
 
             // Update subtitle 2
             if (srtData2.length > 0 && document.getElementById('showSub2').checked) {
-                const text = getCurrentSubtitle(srtData2, currentTime);
-                document.getElementById('liveSubText2').textContent = text;
+                const lines = getCurrentSubtitle(srtData2, currentTime);
+                document.getElementById('liveSubText2Prev').textContent = lines.previous;
+                document.getElementById('liveSubText2').textContent = lines.current;
+                document.getElementById('liveSubText2Next').textContent = lines.next;
             }
 
             // Update subtitle 3
             if (srtData3.length > 0 && document.getElementById('showSub3').checked) {
-                const text = getCurrentSubtitle(srtData3, currentTime);
-                document.getElementById('liveSubText3').textContent = text;
+                const lines = getCurrentSubtitle(srtData3, currentTime);
+                document.getElementById('liveSubText3Prev').textContent = lines.previous;
+                document.getElementById('liveSubText3').textContent = lines.current;
+                document.getElementById('liveSubText3Next').textContent = lines.next;
             }
         }
 
