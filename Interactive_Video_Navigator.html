@@ -197,6 +197,72 @@
         .index-section::-webkit-scrollbar-thumb:hover {
             background: #764ba2;
         }
+
+        /* Live Subtitles Styling */
+        .live-subtitle-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+            min-height: 60px;
+            transition: all 0.3s ease;
+        }
+
+        .live-subtitle-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .subtitle-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .subtitle-label::before {
+            content: "●";
+            color: #28a745;
+            margin-right: 8px;
+            font-size: 1.2rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .subtitle-text {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #2c3e50;
+            font-weight: 500;
+            min-height: 24px;
+        }
+
+        .subtitle-text:empty::before {
+            content: "Waiting for subtitles...";
+            color: #6c757d;
+            font-style: italic;
+            opacity: 0.6;
+        }
+
+        #liveSub1 {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        }
+
+        #liveSub2 {
+            background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+        }
+
+        #liveSub3 {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+        }
     </style>
 </head>
 <body>
@@ -219,13 +285,58 @@
                                     <input type="text" class="form-control" id="videoUrl" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold"><i class="bi bi-file-earmark-text"></i> SRT Subtitle File (Optional)</label>
-                                    <input type="file" class="form-control" id="srtFile" accept=".srt">
+                                    <label class="form-label fw-bold"><i class="bi bi-upload"></i> Upload Index File (Optional)</label>
+                                    <input type="file" class="form-control" id="indexFile" accept=".txt,.index,.md">
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-bold"><i class="bi bi-list-ol"></i> Index Content (Markdown format with timestamps)</label>
                                     <textarea class="form-control" id="indexContent" rows="5" placeholder="Paste your index here with timestamps in format [HH:MM:SS] or (HH:MM:SS)"></textarea>
                                 </div>
+
+                                <!-- Subtitle Files Section -->
+                                <div class="col-12">
+                                    <label class="form-label fw-bold"><i class="bi bi-file-earmark-text"></i> SRT Subtitle Files (Optional - up to 3)</label>
+                                    <div class="row g-2">
+                                        <div class="col-md-4">
+                                            <input type="file" class="form-control form-control-sm" id="srtFile1" accept=".srt">
+                                            <small class="text-muted">Subtitle 1</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="file" class="form-control form-control-sm" id="srtFile2" accept=".srt">
+                                            <small class="text-muted">Subtitle 2</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="file" class="form-control form-control-sm" id="srtFile3" accept=".srt">
+                                            <small class="text-muted">Subtitle 3</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Live Subtitle Display Options -->
+                                <div class="col-12" id="liveSubtitleOptions" style="display:none;">
+                                    <div class="alert alert-info mb-2">
+                                        <i class="bi bi-info-circle"></i> <strong>Live Subtitle Display Options</strong>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="showSub1" checked>
+                                        <label class="form-check-label" for="showSub1">
+                                            <i class="bi bi-eye"></i> Show Subtitle 1
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="showSub2" checked>
+                                        <label class="form-check-label" for="showSub2">
+                                            <i class="bi bi-eye"></i> Show Subtitle 2
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="showSub3" checked>
+                                        <label class="form-check-label" for="showSub3">
+                                            <i class="bi bi-eye"></i> Show Subtitle 3
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div class="col-12">
                                     <button class="btn btn-custom btn-lg" id="loadBtn">
                                         <i class="bi bi-arrow-clockwise"></i> Load Configuration
@@ -267,6 +378,22 @@
                                         <i class="bi bi-hourglass-split fs-1"></i>
                                         <p>Load a video to begin</p>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Live Subtitles Display -->
+                            <div id="liveSubtitlesContainer" style="display:none;">
+                                <div class="live-subtitle-box mt-3" id="liveSub1" style="display:none;">
+                                    <div class="subtitle-label">Subtitle 1</div>
+                                    <div class="subtitle-text" id="liveSubText1"></div>
+                                </div>
+                                <div class="live-subtitle-box mt-2" id="liveSub2" style="display:none;">
+                                    <div class="subtitle-label">Subtitle 2</div>
+                                    <div class="subtitle-text" id="liveSubText2"></div>
+                                </div>
+                                <div class="live-subtitle-box mt-2" id="liveSub3" style="display:none;">
+                                    <div class="subtitle-label">Subtitle 3</div>
+                                    <div class="subtitle-text" id="liveSubText3"></div>
                                 </div>
                             </div>
                         </div>
@@ -324,8 +451,12 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         // ============================================
         let player = null;
         let indexItems = [];
-        let srtData = [];
+        let srtData = []; // For backward compatibility and search
+        let srtData1 = []; // Subtitle file 1
+        let srtData2 = []; // Subtitle file 2
+        let srtData3 = []; // Subtitle file 3
         let currentVideoId = null;
+        let subtitleSyncInterval = null; // Interval for subtitle synchronization
         
         // ============================================
         // UTILITY FUNCTIONS
@@ -594,11 +725,23 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             // Update stats
             const itemCount = indexItems.filter(i => i.type === 'item').length;
             const breakCount = indexItems.filter(i => i.type === 'break').length;
-            document.getElementById('stats').innerHTML = `
+            let statsHTML = `
                 <span class="stats-badge"><i class="bi bi-list-check"></i> ${itemCount} Index Items</span>
                 <span class="stats-badge"><i class="bi bi-pause-circle"></i> ${breakCount} Breaks</span>
-                ${srtData.length > 0 ? `<span class="stats-badge"><i class="bi bi-chat-quote"></i> ${srtData.length} Subtitles</span>` : ''}
             `;
+
+            // Add subtitle stats
+            if (srtData1.length > 0) {
+                statsHTML += `<span class="stats-badge"><i class="bi bi-chat-quote"></i> Sub1: ${srtData1.length}</span>`;
+            }
+            if (srtData2.length > 0) {
+                statsHTML += `<span class="stats-badge"><i class="bi bi-chat-quote"></i> Sub2: ${srtData2.length}</span>`;
+            }
+            if (srtData3.length > 0) {
+                statsHTML += `<span class="stats-badge"><i class="bi bi-chat-quote"></i> Sub3: ${srtData3.length}</span>`;
+            }
+
+            document.getElementById('stats').innerHTML = statsHTML;
         }
         
         /**
@@ -679,21 +822,28 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         function loadConfiguration() {
             const videoUrl = document.getElementById('videoUrl').value || DEFAULT_CONFIG.videoUrl;
             const indexContent = document.getElementById('indexContent').value || DEFAULT_CONFIG.indexContent;
-            
+
             // Extract video ID
             const videoId = getYouTubeVideoId(videoUrl);
             if (!videoId) {
                 alert('Invalid YouTube URL');
                 return;
             }
-            
+
             // Load video
             loadYouTubePlayer(videoId);
-            
+
             // Parse index
             indexItems = parseIndex(indexContent);
             renderIndex();
-            
+
+            // Start subtitle synchronization if any subtitles are loaded
+            if (srtData1.length > 0 || srtData2.length > 0 || srtData3.length > 0) {
+                setTimeout(() => {
+                    startSubtitleSync();
+                }, 2000); // Wait 2 seconds for iframe to be ready
+            }
+
             // Show success message
             const stats = document.getElementById('stats');
             stats.innerHTML += '<div class="alert alert-success mt-2">Configuration loaded successfully!</div>';
@@ -708,27 +858,194 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         function resetConfiguration() {
             document.getElementById('videoUrl').value = DEFAULT_CONFIG.videoUrl;
             document.getElementById('indexContent').value = DEFAULT_CONFIG.indexContent;
-            document.getElementById('srtFile').value = '';
+            document.getElementById('indexFile').value = '';
+            document.getElementById('srtFile1').value = '';
+            document.getElementById('srtFile2').value = '';
+            document.getElementById('srtFile3').value = '';
+
+            // Clear subtitle data
+            srtData = [];
+            srtData1 = [];
+            srtData2 = [];
+            srtData3 = [];
+
+            // Hide subtitle options
+            document.getElementById('liveSubtitleOptions').style.display = 'none';
+            document.getElementById('liveSubtitlesContainer').style.display = 'none';
+
+            // Stop subtitle sync
+            stopSubtitleSync();
+
             loadConfiguration();
         }
         
         /**
-         * Handle SRT file upload
+         * Handle index file upload
          */
-        function handleSRTUpload(event) {
+        function handleIndexUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
+
             const reader = new FileReader();
             reader.onload = function(e) {
-                srtData = parseSRT(e.target.result);
-                document.getElementById('searchPanel').style.display = 'block';
-                renderIndex(); // Update stats
-                
-                alert(`Loaded ${srtData.length} subtitle entries`);
+                document.getElementById('indexContent').value = e.target.result;
             };
             reader.readAsText(file);
         }
+
+        /**
+         * Handle SRT file upload (multiple files)
+         */
+        function handleSRTUpload(fileInputId, subtitleNumber) {
+            return function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const parsedData = parseSRT(e.target.result);
+
+                    // Store in appropriate variable
+                    if (subtitleNumber === 1) {
+                        srtData1 = parsedData;
+                        srtData = parsedData; // For backward compatibility with search
+                    } else if (subtitleNumber === 2) {
+                        srtData2 = parsedData;
+                    } else if (subtitleNumber === 3) {
+                        srtData3 = parsedData;
+                    }
+
+                    // Show subtitle options
+                    document.getElementById('liveSubtitleOptions').style.display = 'block';
+                    document.getElementById('searchPanel').style.display = 'block';
+
+                    // Update stats
+                    renderIndex();
+
+                    // Show appropriate subtitle box
+                    updateLiveSubtitleVisibility();
+
+                    alert(`Loaded ${parsedData.length} subtitle entries for Subtitle ${subtitleNumber}`);
+                };
+                reader.readAsText(file);
+            };
+        }
+
+        /**
+         * Update subtitle visibility based on checkboxes and available data
+         */
+        function updateLiveSubtitleVisibility() {
+            const container = document.getElementById('liveSubtitlesContainer');
+            let anyVisible = false;
+
+            // Subtitle 1
+            if (srtData1.length > 0) {
+                const show = document.getElementById('showSub1').checked;
+                document.getElementById('liveSub1').style.display = show ? 'block' : 'none';
+                if (show) anyVisible = true;
+            }
+
+            // Subtitle 2
+            if (srtData2.length > 0) {
+                const show = document.getElementById('showSub2').checked;
+                document.getElementById('liveSub2').style.display = show ? 'block' : 'none';
+                if (show) anyVisible = true;
+            }
+
+            // Subtitle 3
+            if (srtData3.length > 0) {
+                const show = document.getElementById('showSub3').checked;
+                document.getElementById('liveSub3').style.display = show ? 'block' : 'none';
+                if (show) anyVisible = true;
+            }
+
+            // Show/hide container
+            container.style.display = anyVisible ? 'block' : 'none';
+        }
+
+        /**
+         * Get current subtitle text for given time
+         */
+        function getCurrentSubtitle(srtArray, currentTime) {
+            if (!srtArray || srtArray.length === 0) return '';
+
+            // Find subtitle that matches current time (with 2 second window)
+            const subtitle = srtArray.find(sub => {
+                return currentTime >= sub.time && currentTime < (sub.time + 2);
+            });
+
+            return subtitle ? subtitle.text : '';
+        }
+
+        /**
+         * Update live subtitles display
+         */
+        function updateLiveSubtitles(currentTime) {
+            // Update subtitle 1
+            if (srtData1.length > 0 && document.getElementById('showSub1').checked) {
+                const text = getCurrentSubtitle(srtData1, currentTime);
+                document.getElementById('liveSubText1').textContent = text;
+            }
+
+            // Update subtitle 2
+            if (srtData2.length > 0 && document.getElementById('showSub2').checked) {
+                const text = getCurrentSubtitle(srtData2, currentTime);
+                document.getElementById('liveSubText2').textContent = text;
+            }
+
+            // Update subtitle 3
+            if (srtData3.length > 0 && document.getElementById('showSub3').checked) {
+                const text = getCurrentSubtitle(srtData3, currentTime);
+                document.getElementById('liveSubText3').textContent = text;
+            }
+        }
+
+        /**
+         * Get video current time via postMessage
+         */
+        function startSubtitleSync() {
+            // Stop any existing interval
+            if (subtitleSyncInterval) {
+                clearInterval(subtitleSyncInterval);
+            }
+
+            // Create interval to check video time
+            subtitleSyncInterval = setInterval(() => {
+                const iframe = document.getElementById('ytplayer');
+                if (!iframe) return;
+
+                // Request current time from YouTube iframe
+                iframe.contentWindow.postMessage(JSON.stringify({
+                    event: 'command',
+                    func: 'getCurrentTime',
+                    args: []
+                }), '*');
+            }, 500); // Update every 500ms
+        }
+
+        /**
+         * Stop subtitle synchronization
+         */
+        function stopSubtitleSync() {
+            if (subtitleSyncInterval) {
+                clearInterval(subtitleSyncInterval);
+                subtitleSyncInterval = null;
+            }
+        }
+
+        // Listen for messages from YouTube iframe
+        window.addEventListener('message', function(event) {
+            if (event.origin !== 'https://www.youtube.com') return;
+
+            try {
+                const data = JSON.parse(event.data);
+                if (data.event === 'infoDelivery' && data.info && data.info.currentTime !== undefined) {
+                    updateLiveSubtitles(data.info.currentTime);
+                }
+            } catch (e) {
+                // Ignore parsing errors
+            }
+        });
         
         // ============================================
         // INITIALIZATION
@@ -770,7 +1087,21 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             // Set up event listeners
             document.getElementById('loadBtn').addEventListener('click', loadConfiguration);
             document.getElementById('resetBtn').addEventListener('click', resetConfiguration);
-            document.getElementById('srtFile').addEventListener('change', handleSRTUpload);
+
+            // Index file upload
+            document.getElementById('indexFile').addEventListener('change', handleIndexUpload);
+
+            // SRT file uploads
+            document.getElementById('srtFile1').addEventListener('change', handleSRTUpload('srtFile1', 1));
+            document.getElementById('srtFile2').addEventListener('change', handleSRTUpload('srtFile2', 2));
+            document.getElementById('srtFile3').addEventListener('change', handleSRTUpload('srtFile3', 3));
+
+            // Subtitle visibility checkboxes
+            document.getElementById('showSub1').addEventListener('change', updateLiveSubtitleVisibility);
+            document.getElementById('showSub2').addEventListener('change', updateLiveSubtitleVisibility);
+            document.getElementById('showSub3').addEventListener('change', updateLiveSubtitleVisibility);
+
+            // Search
             document.getElementById('searchBtn').addEventListener('click', function() {
                 const term = document.getElementById('searchInput').value;
                 searchSubtitles(term);
