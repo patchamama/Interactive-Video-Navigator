@@ -1,0 +1,11 @@
+- video no funciona (ver error en consola)
+- brindar opciOn tambiEn de que el video estE fIsicamente en el HD y no solo en youtube
+- Agregar opción para subir el índice
+- poner opción (checkbox) que permita ir visualizando el subtitulo del video mientras se reproduce (bueno para ir seleccionando palabras y buscando su significado)
+- poner la posibilidad de cargar un bundle completo de configuraciOn en que aparezcan varias combinaciones de: 1. video, 2. index 3. subtitulo y que se pueda hacer busquedas en todos los indices y subtitulos de los videos incluidos en el bundle. 
+- Soporte para video en vimeo y otras fuentes.
+- Con KI brindar opcion de que se brinde un resumen del video y de interactuar y responder preguntas
+- con KI que se generen preguntas comunes para repasar si se aprendio bien la clase mostrandose varias respuestas posibles y que sea de un topico determinado o de una parte (con lo ya visto) y  en diferentes idiomas
+ - Cuando se abra un video, intentar automAticamente abrir el archivo de indice y el archivo de subtitulos .srt en el hdd (puedes ponerse una checkbox que indique que se abran automaticamente)
+- Avanzado: con IA abrir pdf y acceder al indice del mismo que permita relacionar el indice de un video con partes del pdf al parsear ambos, creando un archivo de parseo que tenga ya previamente todo esto acoplado y asi no gastar datos de IA. Hacer mejor esto con gemini o IA gratis de ser posible.
+

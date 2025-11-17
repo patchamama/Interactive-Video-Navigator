@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Video Index Navigator</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        
+        .main-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .video-container {
+            position: sticky;
+            top: 20px;
+            z-index: 1000;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+        }
+        
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .index-item {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 12px 15px;
+            margin: 5px 0;
+            border-radius: 8px;
+            border-left: 4px solid transparent;
+        }
+        
+        .index-item:hover {
+            background-color: #f8f9fa;
+            border-left-color: #667eea;
+            transform: translateX(5px);
+        }
+        
+        .index-item.active {
+            background-color: #e7f3ff;
+            border-left-color: #0d6efd;
+            font-weight: 600;
+        }
+        
+        .timestamp {
+            color: #667eea;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            margin-right: 10px;
+        }
+        
+        .break-item {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            border-left-color: #fdcb6e !important;
+            font-weight: 600;
+        }
+        
+        .search-result {
+            background-color: #fff3cd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .search-result:hover {
+            background-color: #ffe69c;
+        }
+        
+        .highlight {
+            background-color: #ffeb3b;
+            font-weight: bold;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            margin: 20px 0 10px 0;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .section-header:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .section-content {
+            padding: 10px 0;
+        }
+        
+        .collapsed .section-content {
+            display: none;
+        }
+        
+        .btn-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        
+        .control-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 5px;
+        }
+        
+        .srt-line {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .index-section {
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        
+        .index-section::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .index-section::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .index-section::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+        
+        .index-section::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="main-container">
+                    <!-- Header -->
+                    <div class="p-4 bg-primary text-white">
+                        <h1 class="mb-2"><i class="bi bi-play-circle-fill"></i> Interactive Video Index Navigator</h1>
+                        <p class="mb-0">Navigate through video content with intelligent indexing and subtitle search</p>
+                    </div>
+                    
+                    <!-- Control Panel -->
+                    <div class="p-4">
+                        <div class="control-panel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold"><i class="bi bi-youtube"></i> YouTube Video URL</label>
+                                    <input type="text" class="form-control" id="videoUrl" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold"><i class="bi bi-file-earmark-text"></i> SRT Subtitle File (Optional)</label>
+                                    <input type="file" class="form-control" id="srtFile" accept=".srt">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold"><i class="bi bi-list-ol"></i> Index Content (Markdown format with timestamps)</label>
+                                    <textarea class="form-control" id="indexContent" rows="5" placeholder="Paste your index here with timestamps in format [HH:MM:SS] or (HH:MM:SS)"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-custom btn-lg" id="loadBtn">
+                                        <i class="bi bi-arrow-clockwise"></i> Load Configuration
+                                    </button>
+                                    <button class="btn btn-secondary btn-lg" id="resetBtn">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Search Panel -->
+                        <div class="control-panel mt-3" id="searchPanel" style="display:none;">
+                            <h5 class="mb-3"><i class="bi bi-search"></i> Search in Subtitles</h5>
+                            <div class="row g-3">
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="searchInput" placeholder="Enter search term...">
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-custom w-100" id="searchBtn">
+                                        <i class="bi bi-search"></i> Search
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="searchResults" class="mt-3"></div>
+                        </div>
+                        
+                        <!-- Stats -->
+                        <div class="text-center mt-3" id="stats"></div>
+                    </div>
+                    
+                    <!-- Main Content -->
+                    <div class="row g-0">
+                        <!-- Video Column -->
+                        <div class="col-lg-5 p-4">
+                            <div class="video-container">
+                                <div class="video-wrapper" id="videoContainer">
+                                    <div class="loading">
+                                        <i class="bi bi-hourglass-split fs-1"></i>
+                                        <p>Load a video to begin</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Index Column -->
+                        <div class="col-lg-7 p-4">
+                            <h3 class="mb-3"><i class="bi bi-list-check"></i> Video Index</h3>
+                            <div class="index-section" id="indexList">
+                                <div class="no-results">
+                                    <i class="bi bi-inbox fs-1"></i>
+                                    <p>No index loaded. Please load your configuration above.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Main Application Script -->
+    <script>
+        // ============================================
+        // DEFAULT CONFIGURATION
+        // ============================================
+        const DEFAULT_CONFIG = {
+            videoUrl: 'https://www.youtube.com/watch?v=ZT9FunQCcSI',
+            indexContent: `PART 1: INTRODUCTION AND INITIAL SETUP (00:02:00 - 01:10:00)
+- [00:02:00] Welcome and initial greetings
+- [00:05:45] Discussion about workflows and technical documentation
+- [00:07:35] Instructor introduction and virtual machine preparation
+- [00:08:28] Access to training materials
+- [00:14:55] Introduction to installations and infrastructure
+
+PART 2: SERVER INSTALLATION (01:10:00 - 02:32:00)
+- [01:10:18] Start of server installation process
+- [01:12:45] Download and start of server installer
+- [01:17:26] Extraction and configuration
+- [01:21:07] Server Setup configuration options
+
+⏸ LUNCH BREAK (02:17:30 - 03:08:40) - ~51 minutes
+
+PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
+- [03:08:40] Resume after break
+- [03:10:03] Verification of completed installation
+- [03:10:58] ELO Administration Console`,
+            srtPath: '' // Optional: path to default SRT file
+        };
+        
+        // ============================================
+        // APPLICATION STATE
+        // ============================================
+        let player = null;
+        let indexItems = [];
+        let srtData = [];
+        let currentVideoId = null;
+        
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        
+        /**
+         * Extract YouTube video ID from URL
+         */
+        function getYouTubeVideoId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+        
+        /**
+         * Convert timestamp to seconds
+         */
+        function timestampToSeconds(timestamp) {
+            const parts = timestamp.split(':').map(p => parseInt(p));
+            if (parts.length === 3) {
+                return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            } else if (parts.length === 2) {
+                return parts[0] * 60 + parts[1];
+            }
+            return 0;
+        }
+        
+        /**
+         * Format seconds to HH:MM:SS
+         */
+        function secondsToTimestamp(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+        
+        /**
+         * Parse index content and extract timestamps
+         */
+        function parseIndex(content) {
+            const lines = content.split('\n');
+            const items = [];
+            let currentSection = null;
+            
+            lines.forEach((line, index) => {
+                line = line.trim();
+                if (!line) return;
+                
+                // Check for section headers
+                if (line.match(/^(PART|CHAPTER|SECTION|\d+\.)/i)) {
+                    currentSection = {
+                        type: 'section',
+                        title: line,
+                        items: [],
+                        id: `section-${items.length}`
+                    };
+                    items.push(currentSection);
+                    return;
+                }
+                
+                // Check for breaks/pauses
+                if (line.match(/⏸|PAUSE|BREAK|LUNCH/i)) {
+                    const timeMatch = line.match(/\[?(\d{1,2}:\d{2}:\d{2})\]?.*\[?(\d{1,2}:\d{2}:\d{2})\]?/);
+                    if (timeMatch) {
+                        items.push({
+                            type: 'break',
+                            text: line,
+                            startTime: timestampToSeconds(timeMatch[1]),
+                            endTime: timestampToSeconds(timeMatch[2])
+                        });
+                    }
+                    return;
+                }
+                
+                // Extract timestamp and text
+                const timestampMatch = line.match(/[\[\(]?(\d{1,2}:\d{2}:\d{2})[\]\)]?/);
+                if (timestampMatch) {
+                    const timestamp = timestampMatch[1];
+                    const text = line.replace(/[\[\(]?\d{1,2}:\d{2}:\d{2}[\]\)]?\s*-?\s*/, '').trim();
+                    
+                    const item = {
+                        type: 'item',
+                        timestamp: timestamp,
+                        time: timestampToSeconds(timestamp),
+                        text: text,
+                        id: `item-${items.length}`,
+                        section: currentSection ? currentSection.title : null
+                    };
+                    
+                    if (currentSection) {
+                        currentSection.items.push(item);
+                    }
+                    items.push(item);
+                }
+            });
+            
+            return items;
+        }
+        
+        /**
+         * Parse SRT file content
+         */
+        function parseSRT(content) {
+            const blocks = content.split(/\n\s*\n/);
+            const subtitles = [];
+            
+            blocks.forEach(block => {
+                const lines = block.trim().split('\n');
+                if (lines.length >= 3) {
+                    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+                    if (timeMatch) {
+                        const startTime = timeMatch[1].replace(',', '.').substring(0, 8);
+                        const text = lines.slice(2).join(' ').trim();
+                        
+                        subtitles.push({
+                            time: timestampToSeconds(startTime),
+                            timestamp: startTime,
+                            text: text
+                        });
+                    }
+                }
+            });
+            
+            return subtitles;
+        }
+        
+        // ============================================
+        // VIDEO PLAYER MANAGEMENT
+        // ============================================
+        
+        /**
+         * Load YouTube player
+         */
+        function loadYouTubePlayer(videoId) {
+            if (!videoId) {
+                alert('Invalid YouTube video ID');
+                return;
+            }
+            
+            currentVideoId = videoId;
+            const container = document.getElementById('videoContainer');
+            
+            // Create iframe
+            container.innerHTML = `
+                <iframe 
+                    id="ytplayer"
+                    width="100%" 
+                    height="100%" 
+                    src="https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            `;
+            
+            // Initialize YouTube API
+            if (!window.YT) {
+                const tag = document.createElement('script');
+                tag.src = "https://www.youtube.com/iframe_api";
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            }
+        }
+        
+        /**
+         * Seek video to specific time
+         */
+        function seekToTime(seconds) {
+            const iframe = document.getElementById('ytplayer');
+            if (iframe) {
+                // Use postMessage to control YouTube iframe
+                iframe.contentWindow.postMessage(JSON.stringify({
+                    event: 'command',
+                    func: 'seekTo',
+                    args: [seconds, true]
+                }), '*');
+                
+                // Scroll video into view
+                iframe.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Update active item
+                updateActiveItem(seconds);
+            }
+        }
+        
+        /**
+         * Update active index item
+         */
+        function updateActiveItem(time) {
+            document.querySelectorAll('.index-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            const activeItem = indexItems.find(item => 
+                item.type === 'item' && Math.abs(item.time - time) < 5
+            );
+            
+            if (activeItem) {
+                const element = document.getElementById(activeItem.id);
+                if (element) {
+                    element.classList.add('active');
+                }
+            }
+        }
+        
+        // ============================================
+        // UI RENDERING
+        // ============================================
+        
+        /**
+         * Render index items
+         */
+        function renderIndex() {
+            const container = document.getElementById('indexList');
+            
+            if (indexItems.length === 0) {
+                container.innerHTML = `
+                    <div class="no-results">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p>No index items found. Please check your index format.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            let currentSection = null;
+            
+            indexItems.forEach(item => {
+                if (item.type === 'section') {
+                    if (currentSection) {
+                        html += '</div></div>';
+                    }
+                    html += `
+                        <div class="section-wrapper">
+                            <div class="section-header" onclick="toggleSection('${item.id}')">
+                                <i class="bi bi-chevron-down" id="icon-${item.id}"></i>
+                                ${item.title}
+                            </div>
+                            <div class="section-content" id="content-${item.id}">
+                    `;
+                    currentSection = item;
+                } else if (item.type === 'break') {
+                    html += `
+                        <div class="index-item break-item">
+                            <i class="bi bi-pause-circle"></i> ${item.text}
+                        </div>
+                    `;
+                } else if (item.type === 'item') {
+                    html += `
+                        <div class="index-item" id="${item.id}" onclick="seekToTime(${item.time})">
+                            <span class="timestamp">${item.timestamp}</span>
+                            <span>${item.text}</span>
+                        </div>
+                    `;
+                }
+            });
+            
+            if (currentSection) {
+                html += '</div></div>';
+            }
+            
+            container.innerHTML = html;
+            
+            // Update stats
+            const itemCount = indexItems.filter(i => i.type === 'item').length;
+            const breakCount = indexItems.filter(i => i.type === 'break').length;
+            document.getElementById('stats').innerHTML = `
+                <span class="stats-badge"><i class="bi bi-list-check"></i> ${itemCount} Index Items</span>
+                <span class="stats-badge"><i class="bi bi-pause-circle"></i> ${breakCount} Breaks</span>
+                ${srtData.length > 0 ? `<span class="stats-badge"><i class="bi bi-chat-quote"></i> ${srtData.length} Subtitles</span>` : ''}
+            `;
+        }
+        
+        /**
+         * Toggle section collapse
+         */
+        function toggleSection(sectionId) {
+            const content = document.getElementById(`content-${sectionId}`);
+            const icon = document.getElementById(`icon-${sectionId}`);
+            const wrapper = content.parentElement;
+            
+            if (wrapper.classList.contains('collapsed')) {
+                wrapper.classList.remove('collapsed');
+                icon.className = 'bi bi-chevron-down';
+            } else {
+                wrapper.classList.add('collapsed');
+                icon.className = 'bi bi-chevron-right';
+            }
+        }
+        
+        // Make function globally available
+        window.toggleSection = toggleSection;
+        window.seekToTime = seekToTime;
+        
+        /**
+         * Render search results
+         */
+        function renderSearchResults(results, searchTerm) {
+            const container = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No results found for "${searchTerm}"
+                    </div>
+                `;
+                return;
+            }
+            
+            const regex = new RegExp(`(${searchTerm})`, 'gi');
+            let html = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> Found ${results.length} results</div>`;
+            
+            results.forEach(result => {
+                const highlightedText = result.text.replace(regex, '<span class="highlight">$1</span>');
+                html += `
+                    <div class="search-result" onclick="seekToTime(${result.time})">
+                        <div><span class="timestamp">${result.timestamp}</span></div>
+                        <div class="srt-line">${highlightedText}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        /**
+         * Search in subtitles
+         */
+        function searchSubtitles(term) {
+            if (!term || srtData.length === 0) {
+                document.getElementById('searchResults').innerHTML = '';
+                return;
+            }
+            
+            const results = srtData.filter(sub => 
+                sub.text.toLowerCase().includes(term.toLowerCase())
+            );
+            
+            renderSearchResults(results, term);
+        }
+        
+        // ============================================
+        // EVENT HANDLERS
+        // ============================================
+        
+        /**
+         * Load configuration
+         */
+        function loadConfiguration() {
+            const videoUrl = document.getElementById('videoUrl').value || DEFAULT_CONFIG.videoUrl;
+            const indexContent = document.getElementById('indexContent').value || DEFAULT_CONFIG.indexContent;
+            
+            // Extract video ID
+            const videoId = getYouTubeVideoId(videoUrl);
+            if (!videoId) {
+                alert('Invalid YouTube URL');
+                return;
+            }
+            
+            // Load video
+            loadYouTubePlayer(videoId);
+            
+            // Parse index
+            indexItems = parseIndex(indexContent);
+            renderIndex();
+            
+            // Show success message
+            const stats = document.getElementById('stats');
+            stats.innerHTML += '<div class="alert alert-success mt-2">Configuration loaded successfully!</div>';
+            setTimeout(() => {
+                stats.querySelector('.alert')?.remove();
+            }, 3000);
+        }
+        
+        /**
+         * Reset to default configuration
+         */
+        function resetConfiguration() {
+            document.getElementById('videoUrl').value = DEFAULT_CONFIG.videoUrl;
+            document.getElementById('indexContent').value = DEFAULT_CONFIG.indexContent;
+            document.getElementById('srtFile').value = '';
+            loadConfiguration();
+        }
+        
+        /**
+         * Handle SRT file upload
+         */
+        function handleSRTUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                srtData = parseSRT(e.target.result);
+                document.getElementById('searchPanel').style.display = 'block';
+                renderIndex(); // Update stats
+                
+                alert(`Loaded ${srtData.length} subtitle entries`);
+            };
+            reader.readAsText(file);
+        }
+        
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up event listeners
+            document.getElementById('loadBtn').addEventListener('click', loadConfiguration);
+            document.getElementById('resetBtn').addEventListener('click', resetConfiguration);
+            document.getElementById('srtFile').addEventListener('change', handleSRTUpload);
+            document.getElementById('searchBtn').addEventListener('click', function() {
+                const term = document.getElementById('searchInput').value;
+                searchSubtitles(term);
+            });
+            
+            // Allow Enter key for search
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const term = this.value;
+                    searchSubtitles(term);
+                }
+            });
+            
+            // Load default configuration
+            resetConfiguration();
+        });
+    </script>
+</body>
+</html>
