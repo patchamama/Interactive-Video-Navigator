@@ -116,12 +116,15 @@
         }
 
         body.theater-mode .current-chapter-box {
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, var(--chapter-opacity, 0.5));
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(0, 0, 0, var(--chapter-opacity, 0.5));
             border-left: 4px solid rgba(33, 150, 243, 0.8);
             backdrop-filter: blur(10px);
             color: white;
             padding: 12px 20px;
+            cursor: move;
+            user-select: none;
         }
 
         body.theater-mode .chapter-label {
@@ -148,12 +151,14 @@
         }
 
         body.theater-mode .live-subtitle-box {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, var(--subtitle-opacity, 0.6));
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(0, 0, 0, var(--subtitle-opacity, 0.6));
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
             margin-top: 10px;
             padding: 12px 20px;
+            cursor: move;
+            user-select: none;
         }
 
         body.theater-mode .subtitle-line {
@@ -400,6 +405,13 @@
             background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
         }
 
+        /* Remove colored backgrounds in theater mode */
+        body.theater-mode #liveSub1,
+        body.theater-mode #liveSub2,
+        body.theater-mode #liveSub3 {
+            background: none;
+        }
+
         /* Search Results Listbox */
         .search-results-listbox {
             background: white;
@@ -497,7 +509,7 @@
                                 <p class="mb-0">Navigate through video content with intelligent indexing and subtitle search</p>
                             </div>
                             <div class="text-end">
-                                <small class="opacity-75" style="font-size: 0.75rem;">v2.0.0</small>
+                                <small class="opacity-75" style="font-size: 0.75rem;">v2.1.0</small>
                             </div>
                         </div>
                     </div>
@@ -678,7 +690,7 @@
         // ============================================
         // APPLICATION VERSION
         // ============================================
-        const APP_VERSION = '2.0.0';
+        const APP_VERSION = '2.1.0';
 
         // ============================================
         // DEFAULT CONFIGURATION
@@ -1441,6 +1453,78 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
 
         // ============================================
+        // THEATER MODE INTERACTIVITY
+        // ============================================
+
+        /**
+         * Make an element draggable
+         */
+        function makeDraggable(element) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+            element.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                // Only in theater mode
+                if (!document.body.classList.contains('theater-mode')) return;
+
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+
+                // Set new position
+                element.style.top = (element.offsetTop - pos2) + "px";
+                element.style.left = (element.offsetLeft - pos1) + "px";
+                element.style.transform = 'none'; // Remove centering transform
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        /**
+         * Handle opacity control with arrow keys
+         */
+        let chapterOpacity = 0.5;
+        let subtitleOpacity = 0.6;
+
+        function handleOpacityKeys(e) {
+            // Only in theater mode
+            if (!document.body.classList.contains('theater-mode')) return;
+
+            const step = 0.1;
+            const root = document.documentElement;
+
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                // Increase opacity (darker)
+                chapterOpacity = Math.min(0.9, chapterOpacity + step);
+                subtitleOpacity = Math.min(0.9, subtitleOpacity + step);
+                root.style.setProperty('--chapter-opacity', chapterOpacity);
+                root.style.setProperty('--subtitle-opacity', subtitleOpacity);
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                // Decrease opacity (lighter)
+                chapterOpacity = Math.max(0.1, chapterOpacity - step);
+                subtitleOpacity = Math.max(0.1, subtitleOpacity - step);
+                root.style.setProperty('--chapter-opacity', chapterOpacity);
+                root.style.setProperty('--subtitle-opacity', subtitleOpacity);
+            }
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
 
@@ -1517,6 +1601,16 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                     searchSubtitles(term);
                 }
             });
+
+            // Theater mode interactivity
+            // Make chapter display draggable
+            makeDraggable(document.getElementById('currentChapterDisplay'));
+
+            // Make subtitle containers draggable
+            makeDraggable(document.getElementById('liveSubtitlesContainer'));
+
+            // Handle keyboard for opacity control
+            document.addEventListener('keydown', handleOpacityKeys);
 
             // Load default configuration
             resetConfiguration();
