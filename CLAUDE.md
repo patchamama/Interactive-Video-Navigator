@@ -46,11 +46,12 @@ Interactive-Video-Navigator/
 
 ### File Descriptions
 
-#### `Interactive_Video_Navigator.html` (760 lines)
+#### `Interactive_Video_Navigator.html` (~1130 lines)
 - **Purpose**: Complete standalone web application
 - **Architecture**: Monolithic HTML file with embedded CSS and JavaScript
 - **Dependencies**: External CDNs only (Bootstrap 5.3, Bootstrap Icons, YouTube iframe API)
 - **No build process required** - open directly in browser
+- **Current Version**: 2.0.0 (displayed in header and console)
 
 #### `README.md`
 - Serves as example content and documentation
@@ -440,6 +441,35 @@ Search Results: Light yellow (#fff3cd)
 ---
 
 ## Development Workflows
+
+### Version Management
+
+**Current Version**: 2.0.0
+
+The application version is managed in two places:
+
+1. **JavaScript constant** (line ~432):
+   ```javascript
+   const APP_VERSION = '2.0.0';
+   ```
+
+2. **Header display** (line ~281):
+   ```html
+   <small class="opacity-75" style="font-size: 0.75rem;">v2.0.0</small>
+   ```
+
+**To update the version:**
+1. Change `APP_VERSION` constant
+2. Update version in header HTML
+3. Update CLAUDE.md (this file)
+4. Commit with semantic version message
+
+**Version format**: Use [Semantic Versioning](https://semver.org/)
+- **Major** (X.0.0): Breaking changes, major new features
+- **Minor** (1.X.0): New features, backward compatible
+- **Patch** (1.0.X): Bug fixes, minor improvements
+
+**Console output**: Version displays automatically on page load with styled console message.
 
 ### Making Code Changes
 
@@ -1081,5 +1111,6 @@ cat README.md
 ---
 
 **Last Updated**: 2025-11-17
-**Version**: 1.0
+**Application Version**: 2.0.0
+**Documentation Version**: 1.1
 **Maintained by**: Claude AI Assistant
