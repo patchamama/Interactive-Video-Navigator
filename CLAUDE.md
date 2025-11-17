@@ -5,6 +5,10 @@
 **Interactive Video Navigator** is a single-page web application designed to provide enhanced navigation for video content (primarily YouTube) through intelligent indexing and subtitle search capabilities. The application allows users to:
 
 - Navigate videos using timestamped indexes
+- Upload index files (.txt, .index, .md) directly
+- Load up to 3 subtitle files (SRT) simultaneously
+- View live synchronized subtitles while video plays
+- Toggle individual subtitle tracks on/off
 - Search within video subtitles (SRT files)
 - Jump to specific video moments with one click
 - Organize content into collapsible sections
@@ -12,6 +16,20 @@
 
 ### Primary Use Case
 Originally created for navigating long training videos (e.g., 9+ hour ELO training sessions) with detailed timestamps and multilingual content.
+
+### Key Features (Updated 2025-11-17)
+
+#### Multiple Subtitle Support
+- **Up to 3 simultaneous subtitle tracks** - Perfect for multilingual learning
+- **Live synchronization** - Subtitles update automatically as video plays
+- **Individual visibility control** - Toggle each subtitle track on/off independently
+- **Color-coded display** - Each subtitle has a distinct color (blue, purple, green)
+- **Real-time updates** - Synchronized every 500ms with video playback
+
+#### Index File Upload
+- **Direct file upload** - No need to copy/paste index content
+- **Multiple formats** - Supports .txt, .index, and .md files
+- **Instant loading** - Automatically populates index textarea
 
 ---
 
@@ -96,6 +114,8 @@ const DEFAULT_CONFIG = { ... }
 // APPLICATION STATE
 // ============================================
 let player, indexItems, srtData, currentVideoId
+let srtData1, srtData2, srtData3  // Multiple subtitle tracks
+let subtitleSyncInterval           // Subtitle synchronization timer
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -227,6 +247,164 @@ Today we'll cover installation procedures
 - Combines multi-line subtitles into single text
 - Converts comma milliseconds to periods
 - Truncates to HH:MM:SS (drops milliseconds)
+
+---
+
+## Multiple Subtitle Support (Added 2025-11-17)
+
+### Overview
+The application now supports loading and displaying up to **3 simultaneous subtitle tracks**. This is perfect for:
+- Multilingual video content (e.g., English, Spanish, German)
+- Comparing different translations
+- Learning languages by viewing multiple subtitles
+- Professional training with multi-language support
+
+### How It Works
+
+#### Loading Subtitles
+1. Use the **3 file upload inputs** in the control panel
+2. Each input accepts `.srt` format files
+3. Subtitles load independently - you can load 1, 2, or all 3
+4. Each subtitle track is stored separately: `srtData1`, `srtData2`, `srtData3`
+
+#### Live Display
+- Subtitles appear **below the video player** in color-coded boxes
+- **Subtitle 1**: Blue gradient (`#e3f2fd` to `#bbdefb`)
+- **Subtitle 2**: Purple gradient (`#f3e5f5` to `#e1bee7`)
+- **Subtitle 3**: Green gradient (`#e8f5e9` to `#c8e6c9`)
+
+#### Synchronization
+- **Update frequency**: Every 500ms
+- **YouTube API integration**: Uses `postMessage` to get current playback time
+- **Smart matching**: Finds subtitle with 2-second time window
+- **Automatic updates**: No manual refresh needed
+
+#### Visibility Controls
+- **Individual checkboxes** for each subtitle track
+- Check/uncheck to show/hide specific subtitles
+- Changes apply immediately without reloading
+- Subtitle boxes only appear when files are loaded
+
+### Data Structure (Multiple Subtitles)
+
+```javascript
+// Global state variables
+let srtData1 = [];  // First subtitle track
+let srtData2 = [];  // Second subtitle track
+let srtData3 = [];  // Third subtitle track
+let srtData = [];   // Backward compatibility (points to srtData1)
+
+// Subtitle entry structure (same for all tracks)
+{
+  time: 125,              // Seconds
+  timestamp: "00:02:05",  // HH:MM:SS
+  text: "Subtitle text"   // Caption content
+}
+```
+
+### Key Functions
+
+| Function | Purpose | Parameters |
+|----------|---------|------------|
+| `handleSRTUpload(fileInputId, subtitleNumber)` | Upload handler factory | Returns function for specific subtitle |
+| `updateLiveSubtitleVisibility()` | Show/hide subtitle boxes | None (reads checkboxes) |
+| `getCurrentSubtitle(srtArray, currentTime)` | Find active subtitle | Array, time in seconds |
+| `updateLiveSubtitles(currentTime)` | Update all subtitle displays | Current video time |
+| `startSubtitleSync()` | Begin time tracking | None |
+| `stopSubtitleSync()` | Stop synchronization | None |
+
+### CSS Classes (Subtitle Display)
+
+```css
+.live-subtitle-box        /* Container for subtitle */
+.subtitle-label           /* Label with animated indicator */
+.subtitle-text            /* Actual subtitle content */
+#liveSub1, #liveSub2, #liveSub3  /* Individual colored boxes */
+```
+
+### Usage Example
+
+```javascript
+// User loads 3 SRT files via UI
+// System automatically:
+1. Parses each SRT file
+2. Stores in srtData1, srtData2, srtData3
+3. Shows visibility checkboxes
+4. Starts synchronization when video loads
+5. Updates subtitle text every 500ms
+
+// User can:
+- Toggle visibility with checkboxes
+- See all 3 subtitles simultaneously
+- Search within any loaded subtitle
+```
+
+### Implementation Notes
+
+**YouTube API Message Handling:**
+```javascript
+window.addEventListener('message', function(event) {
+    if (event.origin !== 'https://www.youtube.com') return;
+    const data = JSON.parse(event.data);
+    if (data.info && data.info.currentTime) {
+        updateLiveSubtitles(data.info.currentTime);
+    }
+});
+```
+
+**Interval Management:**
+```javascript
+// Request current time every 500ms
+subtitleSyncInterval = setInterval(() => {
+    iframe.contentWindow.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'getCurrentTime',
+        args: []
+    }), '*');
+}, 500);
+```
+
+**Smart Subtitle Matching:**
+```javascript
+// Find subtitle within 2-second window
+const subtitle = srtArray.find(sub => {
+    return currentTime >= sub.time &&
+           currentTime < (sub.time + 2);
+});
+```
+
+### Best Practices
+
+✅ **DO:**
+- Load subtitles in order of priority (1 = primary language)
+- Use consistent SRT format for all files
+- Test synchronization with actual video content
+- Keep subtitle text concise for readability
+
+❌ **DON'T:**
+- Load extremely large SRT files (>10,000 entries)
+- Use different timestamp formats between files
+- Forget to start video after loading subtitles
+- Mix SRT encoding formats (stick to UTF-8)
+
+### Troubleshooting
+
+**Subtitles not appearing:**
+- Check that video is playing (iframe loaded)
+- Verify SRT files loaded successfully (check stats)
+- Ensure checkboxes are checked
+- Look for console errors
+
+**Subtitles out of sync:**
+- Verify SRT timestamps match video timing
+- Check if YouTube API is loaded
+- Ensure 2-second window is appropriate
+- Consider adjusting sync interval (currently 500ms)
+
+**Multiple subtitles overlapping:**
+- This is intentional - all visible subtitles show
+- Use checkboxes to hide unwanted tracks
+- Adjust CSS spacing if needed (`.live-subtitle-box` margin)
 
 ---
 
@@ -657,8 +835,11 @@ If you still see warnings:
 ### Priority 1: Core Functionality
 1. **Fix video playback issues** (check console errors)
 2. **Add local video support** (not just YouTube)
-3. **Index file upload** (don't require paste)
-4. **Live subtitle display** (optional checkbox)
+3. ✅ **Index file upload** - COMPLETED (2025-11-17)
+4. ✅ **Live subtitle display** - COMPLETED (2025-11-17)
+   - Supports up to 3 simultaneous subtitle tracks
+   - Individual visibility controls with checkboxes
+   - Color-coded synchronized display
 
 ### Priority 2: Bundle System
 5. **Configuration bundles**
@@ -866,16 +1047,19 @@ iframe.contentWindow.postMessage(JSON.stringify({
 ### Key Line Numbers (Interactive_Video_Navigator.html)
 | Feature | Lines |
 |---------|-------|
-| Styles | 13-200 |
-| HTML structure | 203-288 |
-| Default config | 298-320 |
-| State variables | 325-328 |
-| Utilities | 334-454 |
-| Video management | 460-533 |
-| UI rendering | 540-654 |
-| Event handlers | 678-731 |
-| Passive listener fix | 737-767 |
-| Initialization | 769-789 |
+| Styles | 13-266 |
+| Live subtitle styling | 201-265 |
+| HTML structure | 269-400 |
+| Subtitle display UI | 318-332 |
+| Default config | 424-446 |
+| State variables | 450-459 |
+| Utilities | 464-582 |
+| Video management | 588-717 |
+| UI rendering | 724-863 |
+| Event handlers | 806-1012 |
+| Multiple subtitle functions | 846-1012 |
+| Passive listener fix | 1019-1042 |
+| Initialization | 1074-1108 |
 
 ### Common Tasks
 ```bash
