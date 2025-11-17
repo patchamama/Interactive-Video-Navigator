@@ -629,7 +629,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         // ============================================
         // APPLICATION STATE
         // ============================================
-        let player = null;
+        let player = null; // YouTube Player object
         let indexItems = [];
         let srtData = []; // For backward compatibility and search
         let srtData1 = []; // Subtitle file 1
@@ -637,6 +637,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         let srtData3 = []; // Subtitle file 3
         let currentVideoId = null;
         let subtitleSyncInterval = null; // Interval for subtitle synchronization
+        let youtubeAPIReady = false; // Flag to track if YouTube API is loaded
         
         // ============================================
         // UTILITY FUNCTIONS
@@ -769,37 +770,94 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         // ============================================
         
         /**
-         * Load YouTube player
+         * YouTube API Ready callback
+         */
+        window.onYouTubeIframeAPIReady = function() {
+            youtubeAPIReady = true;
+            console.log('YouTube IFrame API is ready');
+        };
+
+        /**
+         * Load YouTube player using official API
          */
         function loadYouTubePlayer(videoId) {
             if (!videoId) {
                 alert('Invalid YouTube video ID');
                 return;
             }
-            
+
             currentVideoId = videoId;
             const container = document.getElementById('videoContainer');
-            
-            // Create iframe
-            const origin = window.location.origin;
-            container.innerHTML = `
-                <iframe
-                    id="ytplayer"
-                    width="100%"
-                    height="100%"
-                    src="https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${encodeURIComponent(origin)}&rel=0&widgetid=1"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
-            `;
-            
-            // Initialize YouTube API
+
+            // Clear container and create player div
+            container.innerHTML = '<div id="ytplayer"></div>';
+
+            // Load YouTube API if not already loaded
             if (!window.YT) {
                 const tag = document.createElement('script');
                 tag.src = "https://www.youtube.com/iframe_api";
                 const firstScriptTag = document.getElementsByTagName('script')[0];
                 firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+                // Wait for API to load, then create player
+                const checkAPI = setInterval(() => {
+                    if (window.YT && window.YT.Player) {
+                        clearInterval(checkAPI);
+                        createYouTubePlayer(videoId);
+                    }
+                }, 100);
+            } else if (window.YT && window.YT.Player) {
+                // API already loaded, create player immediately
+                createYouTubePlayer(videoId);
+            }
+        }
+
+        /**
+         * Create YouTube player instance
+         */
+        function createYouTubePlayer(videoId) {
+            // Destroy existing player if any
+            if (player && typeof player.destroy === 'function') {
+                player.destroy();
+            }
+
+            // Create new player
+            player = new YT.Player('ytplayer', {
+                width: '100%',
+                height: '100%',
+                videoId: videoId,
+                playerVars: {
+                    'enablejsapi': 1,
+                    'rel': 0,
+                    'modestbranding': 1
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        /**
+         * Player ready event
+         */
+        function onPlayerReady(event) {
+            console.log('YouTube player is ready');
+            // Start subtitle sync
+            startSubtitleSync();
+        }
+
+        /**
+         * Player state change event
+         */
+        function onPlayerStateChange(event) {
+            // YT.PlayerState.PLAYING = 1
+            // YT.PlayerState.PAUSED = 2
+            if (event.data === 1) {
+                console.log('Video is playing');
+                startSubtitleSync();
+            } else if (event.data === 2) {
+                console.log('Video is paused');
             }
         }
         
@@ -807,18 +865,16 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
          * Seek video to specific time
          */
         function seekToTime(seconds) {
-            const iframe = document.getElementById('ytplayer');
-            if (iframe) {
-                // Use postMessage to control YouTube iframe
-                iframe.contentWindow.postMessage(JSON.stringify({
-                    event: 'command',
-                    func: 'seekTo',
-                    args: [seconds, true]
-                }), '*');
-                
+            if (player && typeof player.seekTo === 'function') {
+                // Use YouTube API to seek
+                player.seekTo(seconds, true);
+
                 // Scroll video into view
-                iframe.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                
+                const videoContainer = document.querySelector('.video-container');
+                if (videoContainer) {
+                    videoContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+
                 // Update active item
                 updateActiveItem(seconds);
             }
@@ -1189,7 +1245,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
 
         /**
-         * Get video current time via postMessage
+         * Start subtitle synchronization using YouTube IFrame API
          */
         function startSubtitleSync() {
             // Stop any existing interval
@@ -1197,17 +1253,13 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 clearInterval(subtitleSyncInterval);
             }
 
-            // Create interval to check video time
+            // Create interval to check video time using YouTube API
             subtitleSyncInterval = setInterval(() => {
-                const iframe = document.getElementById('ytplayer');
-                if (!iframe) return;
-
-                // Request current time from YouTube iframe
-                iframe.contentWindow.postMessage(JSON.stringify({
-                    event: 'command',
-                    func: 'getCurrentTime',
-                    args: []
-                }), '*');
+                if (player && typeof player.getCurrentTime === 'function') {
+                    const currentTime = player.getCurrentTime();
+                    updateLiveSubtitles(currentTime);
+                    updateActiveItem(currentTime);
+                }
             }, 500); // Update every 500ms
         }
 
@@ -1276,26 +1328,6 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             }
         }
 
-        // Listen for messages from YouTube iframe
-        window.addEventListener('message', function(event) {
-            // Accept messages from YouTube
-            if (event.origin !== 'https://www.youtube.com' && event.origin !== 'https://www.youtube-nocookie.com') return;
-
-            try {
-                // YouTube sends string data
-                if (typeof event.data === 'string') {
-                    const data = JSON.parse(event.data);
-
-                    // Check for time info from YouTube
-                    if (data.info && typeof data.info.currentTime === 'number') {
-                        updateLiveSubtitles(data.info.currentTime);
-                    }
-                }
-            } catch (e) {
-                // Ignore parsing errors
-            }
-        });
-        
         // ============================================
         // INITIALIZATION
         // ============================================
