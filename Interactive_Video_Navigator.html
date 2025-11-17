@@ -57,14 +57,25 @@
         }
 
         body.theater-mode .video-container {
-            position: relative;
+            position: fixed;
             top: 0;
-            max-width: 75%;
-            margin: 20px auto;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            max-width: 100%;
+            z-index: 9998;
         }
 
         body.theater-mode .video-wrapper {
-            padding-bottom: 42.19%; /* 16:9 aspect ratio at 75% width */
+            padding-bottom: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        body.theater-mode .video-wrapper iframe {
+            width: 100vw !important;
+            height: 100vh !important;
         }
 
         body.theater-mode #configPanel,
@@ -72,41 +83,99 @@
         body.theater-mode .index-section,
         body.theater-mode h3,
         body.theater-mode .p-4.bg-primary,
-        body.theater-mode #toggleConfigBtn {
+        body.theater-mode #toggleConfigBtn,
+        body.theater-mode #searchSection,
+        body.theater-mode #searchResultsContainer {
             display: none !important;
         }
 
         body.theater-mode #theaterModeBtn {
             position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 10000;
+            top: 20px;
+            right: 20px;
+            z-index: 10002;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
         }
 
+        body.theater-mode #theaterModeBtn:hover {
+            background: rgba(0, 0, 0, 0.9);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Chapter display as overlay on top */
         body.theater-mode #currentChapterDisplay {
             display: block !important;
             position: fixed;
-            top: 10px;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 10001;
-            max-width: 70%;
+            max-width: 80%;
         }
 
         body.theater-mode .current-chapter-box {
-            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
-            box-shadow: 0 4px 20px rgba(33, 150, 243, 0.4);
-            border-left: 4px solid #0d47a1;
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            border-left: 4px solid rgba(33, 150, 243, 0.8);
+            backdrop-filter: blur(10px);
             color: white;
+            padding: 12px 20px;
         }
 
         body.theater-mode .chapter-label {
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.7rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
         }
 
         body.theater-mode .chapter-text {
             color: white;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 1);
+            font-size: 1rem;
+        }
+
+        /* Subtitles as overlay at bottom */
+        body.theater-mode #liveSubtitlesContainer {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10001;
+            width: 90%;
+            max-width: 1200px;
+        }
+
+        body.theater-mode .live-subtitle-box {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+            margin-top: 10px;
+            padding: 12px 20px;
+        }
+
+        body.theater-mode .subtitle-line {
+            text-shadow:
+                -2px -2px 0 #000,
+                2px -2px 0 #000,
+                -2px 2px 0 #000,
+                2px 2px 0 #000,
+                0 0 8px rgba(0, 0, 0, 0.9);
+            color: white;
+        }
+
+        body.theater-mode .subtitle-previous,
+        body.theater-mode .subtitle-next {
+            color: rgba(255, 255, 255, 0.7);
+            opacity: 0.8;
+        }
+
+        body.theater-mode .subtitle-current {
+            color: white;
+            font-weight: 700;
+            font-size: 1.2rem;
         }
 
         body.theater-mode .col-lg-5,
