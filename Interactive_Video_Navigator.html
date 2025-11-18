@@ -1242,6 +1242,10 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 getDuration: function() {
                     return videoElement.duration;
                 },
+                getPlayerState: function() {
+                    // Return play state (1 = playing, 2 = paused)
+                    return videoElement.paused ? 2 : 1;
+                },
                 destroy: function() {
                     container.innerHTML = '';
                     URL.revokeObjectURL(videoURL);
@@ -1250,7 +1254,19 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
             // Start subtitle sync when video is ready
             videoElement.addEventListener('loadedmetadata', function() {
+                console.log('Local video loaded, starting subtitle sync');
                 startSubtitleSync();
+            });
+
+            // Also start sync when video starts playing
+            videoElement.addEventListener('play', function() {
+                console.log('Local video playing');
+                startSubtitleSync();
+            });
+
+            // Stop sync when paused (optional, can be removed if you want continuous sync)
+            videoElement.addEventListener('pause', function() {
+                console.log('Local video paused');
             });
 
             return file.name.replace(/\.[^/.]+$/, ""); // Return filename without extension
@@ -1572,7 +1588,8 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
 
         /**
-         * Start subtitle synchronization using YouTube IFrame API
+         * Start subtitle synchronization using video player API
+         * Works with both YouTube IFrame API and HTML5 video element
          */
         function startSubtitleSync() {
             // Stop any existing interval
@@ -1580,7 +1597,8 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 clearInterval(subtitleSyncInterval);
             }
 
-            // Create interval to check video time using YouTube API
+            // Create interval to check video time using player API
+            // Works with YouTube player and HTML5 video element
             subtitleSyncInterval = setInterval(() => {
                 if (player && typeof player.getCurrentTime === 'function') {
                     const currentTime = player.getCurrentTime();
@@ -1711,8 +1729,26 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             const opacityStep = 0.1;
             const root = document.documentElement;
 
+            // Ctrl+Shift + Arrow keys: Move chapter display
+            if (e.ctrlKey && e.shiftKey && (e.key.startsWith('Arrow'))) {
+                e.preventDefault();
+
+                const chapter = document.getElementById('currentChapterDisplay');
+                const currentTop = parseInt(chapter.style.top) || 20;
+                const currentLeft = parseInt(chapter.style.left) || 0;
+
+                if (e.key === 'ArrowUp') {
+                    chapter.style.top = (currentTop - step) + 'px';
+                } else if (e.key === 'ArrowDown') {
+                    chapter.style.top = (currentTop + step) + 'px';
+                } else if (e.key === 'ArrowLeft') {
+                    chapter.style.left = (currentLeft - step) + 'px';
+                } else if (e.key === 'ArrowRight') {
+                    chapter.style.left = (currentLeft + step) + 'px';
+                }
+            }
             // Shift + Arrow keys: Move subtitles
-            if (e.shiftKey && (e.key.startsWith('Arrow'))) {
+            else if (e.shiftKey && !e.ctrlKey && (e.key.startsWith('Arrow'))) {
                 e.preventDefault();
 
                 // Get visible subtitle boxes
