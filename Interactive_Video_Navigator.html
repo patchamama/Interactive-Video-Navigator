@@ -526,7 +526,7 @@
                                 <p class="mb-0">Navigate through video content with intelligent indexing and subtitle search</p>
                             </div>
                             <div class="text-end">
-                                <small class="opacity-75" style="font-size: 0.75rem;">v2.1.0</small>
+                                <small class="opacity-75" style="font-size: 0.75rem;">v2.2.0</small>
                             </div>
                         </div>
                     </div>
@@ -548,14 +548,19 @@
 
                         <div class="control-panel" id="configPanel">
                             <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold"><i class="bi bi-youtube"></i> YouTube Video URL</label>
-                                    <input type="text" class="form-control" id="videoUrl" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
+                                <div class="col-md-12">
+                                    <label class="form-label fw-bold"><i class="bi bi-film"></i> Video URL or Path</label>
+                                    <input type="text" class="form-control" id="videoUrl" placeholder="YouTube URL, file:// URL, or leave empty to select local file">
+                                    <small class="text-muted">
+                                        Examples:
+                                        • YouTube: https://www.youtube.com/watch?v=VIDEO_ID
+                                        • Local file: file:///Users/user/Videos/video.mp4
+                                    </small>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold"><i class="bi bi-film"></i> Local Video File</label>
+                                    <label class="form-label fw-bold"><i class="bi bi-upload"></i> Or Select Local Video File</label>
                                     <input type="file" class="form-control" id="localVideoFile" accept=".mp4,.mkv,video/*">
-                                    <small class="text-muted">Auto-loads matching .srt and .index files</small>
+                                    <small class="text-muted">Alternative to pasting file:// URL above</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold"><i class="bi bi-upload"></i> Upload Index File (Optional)</label>
@@ -742,13 +747,13 @@
         // ============================================
         // APPLICATION VERSION
         // ============================================
-        const APP_VERSION = '2.1.0';
+        const APP_VERSION = '2.2.0';
 
         // ============================================
         // DEFAULT CONFIGURATION
         // ============================================
         const DEFAULT_CONFIG = {
-            videoUrl: 'https://www.youtube.com/watch?v=FfcHXFGcYxQ',
+            videoUrl: 'file:///Users/mandy/Movies/Entrevista%20Vicente%20Merlo%20-%20Espiritualidad%20y%20Psicologi%CC%81a%20Transpersonal-Vx1mKd7kBtA.mp4',
             indexContent: `PART 1: INTRODUCTION AND INITIAL SETUP (00:02:00 - 01:10:00)
 - [00:02:00] Welcome and initial greetings
 - [00:05:45] Discussion about workflows and technical documentation
@@ -1293,6 +1298,87 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
 
         /**
+         * Load local video from file:// URL
+         */
+        function loadLocalVideoFromURL(fileURL) {
+            console.log('Loading video from file:// URL:', fileURL);
+
+            const container = document.getElementById('videoContainer');
+
+            // Extract filename from URL for logging
+            const urlPath = decodeURIComponent(fileURL.replace('file://', ''));
+            const filename = urlPath.split('/').pop();
+            console.log('Extracted filename:', filename);
+
+            // Create HTML5 video player
+            container.innerHTML = `
+                <video id="localPlayer" controls style="width: 100%; height: 100%;">
+                    <source src="${fileURL}">
+                    Your browser does not support the video tag.
+                </video>
+            `;
+
+            // Set up global player reference for compatibility
+            const videoElement = document.getElementById('localPlayer');
+
+            console.log('Video element created:', videoElement);
+            console.log('Video element src:', videoElement.src);
+            console.log('Video source element src:', videoElement.querySelector('source')?.src);
+
+            player = {
+                seekTo: function(seconds) {
+                    videoElement.currentTime = seconds;
+                },
+                getCurrentTime: function() {
+                    return videoElement.currentTime;
+                },
+                getDuration: function() {
+                    return videoElement.duration;
+                },
+                getPlayerState: function() {
+                    // Return play state (1 = playing, 2 = paused)
+                    return videoElement.paused ? 2 : 1;
+                },
+                destroy: function() {
+                    container.innerHTML = '';
+                }
+            };
+
+            // Start subtitle sync when video is ready
+            videoElement.addEventListener('loadedmetadata', function() {
+                console.log('✓ Local video metadata loaded. Duration:', videoElement.duration);
+                console.log('✓ Video currentSrc:', videoElement.currentSrc);
+                console.log('✓ Starting subtitle synchronization...');
+                startSubtitleSync();
+            });
+
+            // Also start sync when video starts playing
+            videoElement.addEventListener('play', function() {
+                console.log('✓ Local video playing');
+                startSubtitleSync();
+            });
+
+            // Stop sync when paused (optional)
+            videoElement.addEventListener('pause', function() {
+                console.log('Local video paused');
+            });
+
+            // Error handling
+            videoElement.addEventListener('error', function(e) {
+                console.error('✗ Error loading video:', e);
+                console.error('Video error code:', videoElement.error ? videoElement.error.code : 'unknown');
+                console.error('Video error message:', videoElement.error ? videoElement.error.message : 'none');
+
+                // Show user-friendly error message
+                alert('Error loading video from file:// URL.\n\nPlease ensure:\n1. The file path is correct\n2. The file exists\n3. You have permission to access the file\n\nAlternatively, use the "Select Local Video File" button to browse for your video.');
+            });
+
+            console.log('✓ Local video player setup complete (file:// URL)');
+
+            return filename.replace(/\.[^/.]+$/, ""); // Return filename without extension
+        }
+
+        /**
          * Auto-load related subtitle and index files for local video
          */
         async function autoLoadRelatedFiles(baseFilename) {
@@ -1363,11 +1449,28 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             const indexContent = document.getElementById('indexContent').value || DEFAULT_CONFIG.indexContent;
 
             console.log('=== Loading Configuration ===');
+            console.log('Video URL input:', videoUrl);
 
-            // Check if local video file is selected
-            if (localVideoInput.files && localVideoInput.files[0]) {
+            // Check if videoUrl contains file:// protocol
+            if (videoUrl && videoUrl.startsWith('file://')) {
+                console.log('Detected file:// URL in video URL input');
+                loadLocalVideoFromURL(videoUrl);
+
+                // Parse index from textarea only if provided
+                if (indexContent && indexContent !== DEFAULT_CONFIG.indexContent) {
+                    console.log('Loading index content from textarea');
+                    indexItems = parseIndex(indexContent);
+                    renderIndex();
+                }
+
+                // Note: Auto-loading of .srt and .index files only works when running from a web server
+                console.log('ℹ Note: Auto-loading of .srt and .index files only works when running from a web server');
+                console.log('  For file:// protocol, please manually upload subtitle and index files');
+            }
+            // Check if local video file is selected via file input
+            else if (localVideoInput.files && localVideoInput.files[0]) {
                 const file = localVideoInput.files[0];
-                console.log('Local video file selected:', file.name);
+                console.log('Local video file selected via file input:', file.name);
 
                 loadLocalVideo(file);
 
@@ -1379,7 +1482,6 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 }
 
                 // Note: Auto-loading of .srt and .index files only works when running from a web server
-                // For file:// protocol, users need to manually upload subtitle and index files
                 console.log('ℹ Note: Auto-loading of .srt and .index files only works when running from a web server');
                 console.log('  Run: python3 -m http.server 8000');
             }
