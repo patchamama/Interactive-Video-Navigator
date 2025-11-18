@@ -5,6 +5,10 @@
 **Interactive Video Navigator** is a single-page web application designed to provide enhanced navigation for video content (primarily YouTube) through intelligent indexing and subtitle search capabilities. The application allows users to:
 
 - Navigate videos using timestamped indexes
+- Upload index files (.txt, .index, .md) directly
+- Load up to 3 subtitle files (SRT) simultaneously
+- View live synchronized subtitles while video plays
+- Toggle individual subtitle tracks on/off
 - Search within video subtitles (SRT files)
 - Jump to specific video moments with one click
 - Organize content into collapsible sections
@@ -12,6 +16,20 @@
 
 ### Primary Use Case
 Originally created for navigating long training videos (e.g., 9+ hour ELO training sessions) with detailed timestamps and multilingual content.
+
+### Key Features (Updated 2025-11-17)
+
+#### Multiple Subtitle Support
+- **Up to 3 simultaneous subtitle tracks** - Perfect for multilingual learning
+- **Live synchronization** - Subtitles update automatically as video plays
+- **Individual visibility control** - Toggle each subtitle track on/off independently
+- **Color-coded display** - Each subtitle has a distinct color (blue, purple, green)
+- **Real-time updates** - Synchronized every 500ms with video playback
+
+#### Index File Upload
+- **Direct file upload** - No need to copy/paste index content
+- **Multiple formats** - Supports .txt, .index, and .md files
+- **Instant loading** - Automatically populates index textarea
 
 ---
 
@@ -28,11 +46,12 @@ Interactive-Video-Navigator/
 
 ### File Descriptions
 
-#### `Interactive_Video_Navigator.html` (760 lines)
+#### `Interactive_Video_Navigator.html` (~1130 lines)
 - **Purpose**: Complete standalone web application
 - **Architecture**: Monolithic HTML file with embedded CSS and JavaScript
 - **Dependencies**: External CDNs only (Bootstrap 5.3, Bootstrap Icons, YouTube iframe API)
 - **No build process required** - open directly in browser
+- **Current Version**: 2.0.0 (displayed in header and console)
 
 #### `README.md`
 - Serves as example content and documentation
@@ -72,7 +91,7 @@ Interactive-Video-Navigator/
 
 3. **Event-Driven Architecture**
    - DOM event listeners for user interactions
-   - YouTube postMessage API for video control
+   - YouTube IFrame API for video control and time tracking
 
 4. **Functional Programming**
    - Pure utility functions for parsing and formatting
@@ -96,6 +115,8 @@ const DEFAULT_CONFIG = { ... }
 // APPLICATION STATE
 // ============================================
 let player, indexItems, srtData, currentVideoId
+let srtData1, srtData2, srtData3  // Multiple subtitle tracks
+let subtitleSyncInterval           // Subtitle synchronization timer
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -230,6 +251,173 @@ Today we'll cover installation procedures
 
 ---
 
+## Multiple Subtitle Support (Added 2025-11-17)
+
+### Overview
+The application now supports loading and displaying up to **3 simultaneous subtitle tracks**. This is perfect for:
+- Multilingual video content (e.g., English, Spanish, German)
+- Comparing different translations
+- Learning languages by viewing multiple subtitles
+- Professional training with multi-language support
+
+### How It Works
+
+#### Loading Subtitles
+1. Use the **3 file upload inputs** in the control panel
+2. Each input accepts `.srt` format files
+3. Subtitles load independently - you can load 1, 2, or all 3
+4. Each subtitle track is stored separately: `srtData1`, `srtData2`, `srtData3`
+
+#### Live Display
+- Subtitles appear **below the video player** in color-coded boxes
+- **Subtitle 1**: Blue gradient (`#e3f2fd` to `#bbdefb`)
+- **Subtitle 2**: Purple gradient (`#f3e5f5` to `#e1bee7`)
+- **Subtitle 3**: Green gradient (`#e8f5e9` to `#c8e6c9`)
+
+#### Synchronization
+- **Update frequency**: Every 500ms
+- **YouTube API integration**: Uses official YouTube IFrame API (`player.getCurrentTime()`)
+- **Smart matching**: Finds subtitle with 2-second time window
+- **Automatic updates**: No manual refresh needed
+- **Chapter tracking**: Also updates active index item synchronously
+
+#### Visibility Controls
+- **Individual checkboxes** for each subtitle track
+- Check/uncheck to show/hide specific subtitles
+- Changes apply immediately without reloading
+- Subtitle boxes only appear when files are loaded
+
+### Data Structure (Multiple Subtitles)
+
+```javascript
+// Global state variables
+let srtData1 = [];  // First subtitle track
+let srtData2 = [];  // Second subtitle track
+let srtData3 = [];  // Third subtitle track
+let srtData = [];   // Backward compatibility (points to srtData1)
+
+// Subtitle entry structure (same for all tracks)
+{
+  time: 125,              // Seconds
+  timestamp: "00:02:05",  // HH:MM:SS
+  text: "Subtitle text"   // Caption content
+}
+```
+
+### Key Functions
+
+| Function | Purpose | Parameters |
+|----------|---------|------------|
+| `handleSRTUpload(fileInputId, subtitleNumber)` | Upload handler factory | Returns function for specific subtitle |
+| `updateLiveSubtitleVisibility()` | Show/hide subtitle boxes | None (reads checkboxes) |
+| `getCurrentSubtitle(srtArray, currentTime)` | Find active subtitle | Array, time in seconds |
+| `updateLiveSubtitles(currentTime)` | Update all subtitle displays | Current video time |
+| `startSubtitleSync()` | Begin time tracking | None |
+| `stopSubtitleSync()` | Stop synchronization | None |
+
+### CSS Classes (Subtitle Display)
+
+```css
+.live-subtitle-box        /* Container for subtitle */
+.subtitle-label           /* Label with animated indicator */
+.subtitle-text            /* Actual subtitle content */
+#liveSub1, #liveSub2, #liveSub3  /* Individual colored boxes */
+```
+
+### Usage Example
+
+```javascript
+// User loads 3 SRT files via UI
+// System automatically:
+1. Parses each SRT file
+2. Stores in srtData1, srtData2, srtData3
+3. Shows visibility checkboxes
+4. Starts synchronization when video loads
+5. Updates subtitle text every 500ms
+
+// User can:
+- Toggle visibility with checkboxes
+- See all 3 subtitles simultaneously
+- Search within any loaded subtitle
+```
+
+### Implementation Notes
+
+**YouTube IFrame API Player:**
+```javascript
+// Create YouTube player instance
+player = new YT.Player('ytplayer', {
+    width: '100%',
+    height: '100%',
+    videoId: videoId,
+    playerVars: {
+        'enablejsapi': 1,
+        'rel': 0,
+        'modestbranding': 1
+    },
+    events: {
+        'onReady': onPlayerReady,
+        'onStateChange': onPlayerStateChange
+    }
+});
+```
+
+**Synchronization Loop:**
+```javascript
+// Update subtitles and chapter every 500ms
+subtitleSyncInterval = setInterval(() => {
+    if (player && typeof player.getCurrentTime === 'function') {
+        const currentTime = player.getCurrentTime();
+        updateLiveSubtitles(currentTime);
+        updateActiveItem(currentTime);
+    }
+}, 500);
+```
+
+**Smart Subtitle Matching:**
+```javascript
+// Find subtitle within 2-second window
+const subtitle = srtArray.find(sub => {
+    return currentTime >= sub.time &&
+           currentTime < (sub.time + 2);
+});
+```
+
+### Best Practices
+
+✅ **DO:**
+- Load subtitles in order of priority (1 = primary language)
+- Use consistent SRT format for all files
+- Test synchronization with actual video content
+- Keep subtitle text concise for readability
+
+❌ **DON'T:**
+- Load extremely large SRT files (>10,000 entries)
+- Use different timestamp formats between files
+- Forget to start video after loading subtitles
+- Mix SRT encoding formats (stick to UTF-8)
+
+### Troubleshooting
+
+**Subtitles not appearing:**
+- Check that video is playing (iframe loaded)
+- Verify SRT files loaded successfully (check stats)
+- Ensure checkboxes are checked
+- Look for console errors
+
+**Subtitles out of sync:**
+- Verify SRT timestamps match video timing
+- Check if YouTube API is loaded
+- Ensure 2-second window is appropriate
+- Consider adjusting sync interval (currently 500ms)
+
+**Multiple subtitles overlapping:**
+- This is intentional - all visible subtitles show
+- Use checkboxes to hide unwanted tracks
+- Adjust CSS spacing if needed (`.live-subtitle-box` margin)
+
+---
+
 ## Styling and UI Conventions
 
 ### Color Scheme
@@ -262,6 +450,35 @@ Search Results: Light yellow (#fff3cd)
 ---
 
 ## Development Workflows
+
+### Version Management
+
+**Current Version**: 2.0.0
+
+The application version is managed in two places:
+
+1. **JavaScript constant** (line ~432):
+   ```javascript
+   const APP_VERSION = '2.0.0';
+   ```
+
+2. **Header display** (line ~281):
+   ```html
+   <small class="opacity-75" style="font-size: 0.75rem;">v2.0.0</small>
+   ```
+
+**To update the version:**
+1. Change `APP_VERSION` constant
+2. Update version in header HTML
+3. Update CLAUDE.md (this file)
+4. Commit with semantic version message
+
+**Version format**: Use [Semantic Versioning](https://semver.org/)
+- **Major** (X.0.0): Breaking changes, major new features
+- **Minor** (1.X.0): New features, backward compatible
+- **Patch** (1.0.X): Bug fixes, minor improvements
+
+**Console output**: Version displays automatically on page load with styled console message.
 
 ### Making Code Changes
 
@@ -522,9 +739,46 @@ Currently: No persistence (resets on page reload)
 
 ---
 
+## Performance Optimizations
+
+### Passive Event Listeners (Added 2025-11-17)
+The application automatically marks scroll-blocking events as passive to improve scrolling performance and eliminate browser warnings.
+
+**Implementation** (lines 737-767):
+```javascript
+// Patches addEventListener to add { passive: true } to:
+// - touchstart, touchmove
+// - wheel, mousewheel
+
+// Before: Browser warning about non-passive listeners
+// After: Smooth scrolling, no warnings
+```
+
+**Why this matters:**
+- Eliminates console warning: `[Violation] Added non-passive event listener to a scroll-blocking event`
+- Improves scroll performance on touch devices
+- Allows browser to optimize scrolling without waiting for `preventDefault()` checks
+- Benefits Bootstrap and other third-party libraries automatically
+
+**Technical details:**
+- Polyfill runs before DOMContentLoaded
+- Patches `EventTarget.prototype.addEventListener` globally
+- Only affects touch and wheel events
+- Preserves explicit `passive: false` if needed
+
 ## Troubleshooting
 
 ### Common Issues
+
+#### Passive Event Listener Warnings
+**Symptoms**: Console warning about non-passive event listeners
+**Fixed**: Automatic passive event listener polyfill (lines 737-767)
+**Status**: Resolved as of 2025-11-17
+
+If you still see warnings:
+- Check browser console for specific event type
+- Verify polyfill is loading (should be before DOMContentLoaded)
+- Check if third-party scripts load before the polyfill
 
 #### Video Not Playing
 **Symptoms**: Video doesn't load or shows errors
@@ -543,16 +797,17 @@ Currently: No persistence (resets on page reload)
 #### Timestamps Not Working
 **Symptoms**: Clicking timestamps doesn't seek video
 **Causes**:
-1. YouTube API not loaded
-2. postMessage blocked
+1. YouTube IFrame API not loaded
+2. Player object not initialized
 3. Invalid timestamp format
-4. iframe not ready
+4. Player not ready
 
 **Solutions**:
 - Check console for YouTube API errors
-- Verify iframe has `enablejsapi=1` parameter
+- Verify `player` object exists in console
 - Check timestamp format (HH:MM:SS)
-- Wait for iframe to fully load
+- Wait for `onPlayerReady` callback
+- Ensure YouTube IFrame API script loaded successfully
 
 #### Index Not Parsing
 **Symptoms**: "No index items found" message
@@ -620,8 +875,11 @@ Currently: No persistence (resets on page reload)
 ### Priority 1: Core Functionality
 1. **Fix video playback issues** (check console errors)
 2. **Add local video support** (not just YouTube)
-3. **Index file upload** (don't require paste)
-4. **Live subtitle display** (optional checkbox)
+3. ✅ **Index file upload** - COMPLETED (2025-11-17)
+4. ✅ **Live subtitle display** - COMPLETED (2025-11-17)
+   - Supports up to 3 simultaneous subtitle tracks
+   - Individual visibility controls with checkboxes
+   - Color-coded synchronized display
 
 ### Priority 2: Bundle System
 5. **Configuration bundles**
@@ -669,23 +927,36 @@ toggleSection(sectionId: string): void
 seekToTime(seconds: number): void
 ```
 
-### YouTube iframe API Integration
+### YouTube IFrame API Integration
 
 ```javascript
-// Seek command via postMessage
-iframe.contentWindow.postMessage(JSON.stringify({
-    event: 'command',
-    func: 'seekTo',
-    args: [seconds, true]
-}), '*');
+// Load YouTube IFrame API
+const tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+
+// Create player instance
+player = new YT.Player('ytplayer', {
+    videoId: videoId,
+    events: {
+        'onReady': onPlayerReady,
+        'onStateChange': onPlayerStateChange
+    }
+});
+
+// Seek to timestamp
+player.seekTo(seconds, true);
+
+// Get current playback time
+const currentTime = player.getCurrentTime();
 ```
 
 ### Browser APIs Used
 - `FileReader` - For SRT/index file uploads
 - `localStorage` - Not yet implemented (planned)
-- `postMessage` - YouTube iframe control
+- `YT.Player` - YouTube IFrame API for video control
 - `scrollIntoView` - Smooth scrolling
 - `setTimeout` - Debouncing alerts
+- `setInterval` - Subtitle synchronization
 
 ---
 
@@ -768,17 +1039,21 @@ document.querySelectorAll('.section-header').forEach(h => h.click())
 ### Debugging Video Issues
 
 ```javascript
-// Check YouTube iframe
-const iframe = document.getElementById('ytplayer');
-console.log('Iframe:', iframe);
-console.log('Iframe src:', iframe?.src);
+// Check YouTube player object
+console.log('Player:', player);
+console.log('Player state:', player?.getPlayerState());
+console.log('Current time:', player?.getCurrentTime());
 
-// Test postMessage
-iframe.contentWindow.postMessage(JSON.stringify({
-    event: 'command',
-    func: 'getCurrentTime',
-    args: []
-}), '*');
+// Test player methods
+if (player) {
+    player.seekTo(60);  // Seek to 1:00
+    console.log('Duration:', player.getDuration());
+    console.log('Video ID:', player.getVideoData().video_id);
+}
+
+// Check if YouTube API is loaded
+console.log('YT object:', window.YT);
+console.log('YT.Player:', window.YT?.Player);
 ```
 
 ---
@@ -829,15 +1104,19 @@ iframe.contentWindow.postMessage(JSON.stringify({
 ### Key Line Numbers (Interactive_Video_Navigator.html)
 | Feature | Lines |
 |---------|-------|
-| Styles | 13-200 |
-| HTML structure | 203-288 |
-| Default config | 298-320 |
-| State variables | 325-328 |
-| Utilities | 334-454 |
-| Video management | 460-533 |
-| UI rendering | 540-654 |
-| Event handlers | 678-731 |
-| Initialization | 737-757 |
+| Styles | 13-266 |
+| Live subtitle styling | 201-265 |
+| HTML structure | 269-400 |
+| Subtitle display UI | 318-332 |
+| Default config | 424-446 |
+| State variables | 450-459 |
+| Utilities | 464-582 |
+| Video management | 588-717 |
+| UI rendering | 724-863 |
+| Event handlers | 806-1012 |
+| Multiple subtitle functions | 846-1012 |
+| Passive listener fix | 1019-1042 |
+| Initialization | 1074-1108 |
 
 ### Common Tasks
 ```bash
@@ -859,5 +1138,6 @@ cat README.md
 ---
 
 **Last Updated**: 2025-11-17
-**Version**: 1.0
+**Application Version**: 2.0.0
+**Documentation Version**: 1.1
 **Maintained by**: Claude AI Assistant
