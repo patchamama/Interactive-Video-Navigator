@@ -169,11 +169,15 @@
 
         body.theater-mode .subtitle-line {
             text-shadow:
-                -2px -2px 0 #000,
-                2px -2px 0 #000,
-                -2px 2px 0 #000,
-                2px 2px 0 #000,
-                0 0 8px rgba(0, 0, 0, 0.9);
+                -3px -3px 0 #000,
+                3px -3px 0 #000,
+                -3px 3px 0 #000,
+                3px 3px 0 #000,
+                -3px 0 0 #000,
+                3px 0 0 #000,
+                0 -3px 0 #000,
+                0 3px 0 #000,
+                0 0 12px rgba(0, 0, 0, 1);
             color: white;
         }
 
@@ -383,20 +387,20 @@
         .subtitle-previous {
             color: #6c757d;
             opacity: 0.6;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
         }
 
         .subtitle-current {
             color: #2c3e50;
             font-weight: 600;
-            font-size: 1.05rem;
+            font-size: 0.95rem;
             padding: 6px 0;
         }
 
         .subtitle-next {
             color: #6c757d;
             opacity: 0.6;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
         }
 
         #liveSub1 {
@@ -540,6 +544,11 @@
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold"><i class="bi bi-youtube"></i> YouTube Video URL</label>
                                     <input type="text" class="form-control" id="videoUrl" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold"><i class="bi bi-film"></i> Local Video File</label>
+                                    <input type="file" class="form-control" id="localVideoFile" accept="video/*">
+                                    <small class="text-muted">Auto-loads matching .srt and .index files</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold"><i class="bi bi-upload"></i> Upload Index File (Optional)</label>
@@ -1197,35 +1206,157 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
         
         // ============================================
+        // LOCAL VIDEO SUPPORT
+        // ============================================
+
+        /**
+         * Load local video file with HTML5 player
+         */
+        function loadLocalVideo(file) {
+            const container = document.getElementById('videoContainer');
+            const videoURL = URL.createObjectURL(file);
+
+            // Create HTML5 video player
+            container.innerHTML = `
+                <video id="localPlayer" controls style="width: 100%; height: 100%;">
+                    <source src="${videoURL}" type="${file.type}">
+                    Your browser does not support the video tag.
+                </video>
+            `;
+
+            // Set up global player reference for compatibility
+            const videoElement = document.getElementById('localPlayer');
+            player = {
+                seekTo: function(seconds) {
+                    videoElement.currentTime = seconds;
+                },
+                getCurrentTime: function() {
+                    return videoElement.currentTime;
+                },
+                getDuration: function() {
+                    return videoElement.duration;
+                },
+                destroy: function() {
+                    container.innerHTML = '';
+                    URL.revokeObjectURL(videoURL);
+                }
+            };
+
+            // Start subtitle sync when video is ready
+            videoElement.addEventListener('loadedmetadata', function() {
+                startSubtitleSync();
+            });
+
+            return file.name.replace(/\.[^/.]+$/, ""); // Return filename without extension
+        }
+
+        /**
+         * Auto-load related subtitle and index files for local video
+         */
+        async function autoLoadRelatedFiles(baseFilename) {
+            // Try to load subtitles in order: .de.srt, .srt, .es.srt, .en.srt
+            const subtitleExtensions = ['.de.srt', '.srt', '.es.srt', '.en.srt'];
+            let subtitleCount = 0;
+
+            for (const ext of subtitleExtensions) {
+                if (subtitleCount >= 3) break;
+
+                try {
+                    const response = await fetch(baseFilename + ext);
+                    if (response.ok) {
+                        const content = await response.text();
+                        const parsedData = parseSRT(content);
+
+                        if (subtitleCount === 0) {
+                            srtData1 = parsedData;
+                            srtData = parsedData;
+                            document.getElementById('showSub1').checked = true;
+                        } else if (subtitleCount === 1) {
+                            srtData2 = parsedData;
+                            document.getElementById('showSub2').checked = true;
+                        } else if (subtitleCount === 2) {
+                            srtData3 = parsedData;
+                            document.getElementById('showSub3').checked = true;
+                        }
+
+                        subtitleCount++;
+                        console.log(`Auto-loaded subtitle: ${baseFilename + ext}`);
+                    }
+                } catch (e) {
+                    // File doesn't exist, continue
+                }
+            }
+
+            // Try to load index file
+            try {
+                const response = await fetch(baseFilename + '.index');
+                if (response.ok) {
+                    const content = await response.text();
+                    indexItems = parseIndex(content);
+                    renderIndex();
+                    // Don't show content in textarea when auto-loaded
+                    console.log(`Auto-loaded index: ${baseFilename}.index`);
+                }
+            } catch (e) {
+                // Index file doesn't exist
+            }
+
+            // Show subtitle options if any were loaded
+            if (subtitleCount > 0) {
+                document.getElementById('liveSubtitleOptions').style.display = 'block';
+                updateLiveSubtitleVisibility();
+            }
+        }
+
+        // ============================================
         // EVENT HANDLERS
         // ============================================
-        
+
         /**
          * Load configuration
          */
         function loadConfiguration() {
-            const videoUrl = document.getElementById('videoUrl').value || DEFAULT_CONFIG.videoUrl;
+            const videoUrl = document.getElementById('videoUrl').value;
+            const localVideoInput = document.getElementById('localVideoFile');
             const indexContent = document.getElementById('indexContent').value || DEFAULT_CONFIG.indexContent;
 
-            // Extract video ID
-            const videoId = getYouTubeVideoId(videoUrl);
-            if (!videoId) {
-                alert('Invalid YouTube URL');
-                return;
+            // Check if local video file is selected
+            if (localVideoInput.files && localVideoInput.files[0]) {
+                const file = localVideoInput.files[0];
+                const baseFilename = loadLocalVideo(file);
+
+                // Try to auto-load related files
+                autoLoadRelatedFiles(baseFilename);
+
+                // Parse index from textarea only if provided
+                if (indexContent !== DEFAULT_CONFIG.indexContent) {
+                    indexItems = parseIndex(indexContent);
+                    renderIndex();
+                }
             }
+            // Otherwise, load YouTube video
+            else {
+                const urlToUse = videoUrl || DEFAULT_CONFIG.videoUrl;
+                const videoId = getYouTubeVideoId(urlToUse);
 
-            // Load video
-            loadYouTubePlayer(videoId);
+                if (!videoId) {
+                    alert('Please provide a valid YouTube URL or select a local video file');
+                    return;
+                }
 
-            // Parse index
-            indexItems = parseIndex(indexContent);
-            renderIndex();
+                // Load YouTube video
+                loadYouTubePlayer(videoId);
 
-            // Start subtitle synchronization if any subtitles are loaded
-            if (srtData1.length > 0 || srtData2.length > 0 || srtData3.length > 0) {
-                setTimeout(() => {
-                    startSubtitleSync();
-                }, 2000); // Wait 2 seconds for iframe to be ready
+                // Parse index
+                indexItems = parseIndex(indexContent);
+                renderIndex();
+
+                // Start subtitle synchronization if any subtitles are loaded
+                if (srtData1.length > 0 || srtData2.length > 0 || srtData3.length > 0) {
+                    setTimeout(() => {
+                        startSubtitleSync();
+                    }, 2000); // Wait 2 seconds for iframe to be ready
+                }
             }
 
             // Show success message
@@ -1241,6 +1372,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
          */
         function resetConfiguration() {
             document.getElementById('videoUrl').value = DEFAULT_CONFIG.videoUrl;
+            document.getElementById('localVideoFile').value = '';
             document.getElementById('indexContent').value = DEFAULT_CONFIG.indexContent;
             document.getElementById('indexFile').value = '';
             document.getElementById('srtFile1').value = '';
@@ -1560,30 +1692,76 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
 
         /**
-         * Handle opacity control with arrow keys
+         * Handle keyboard controls for theater mode
          */
         let chapterOpacity = 0.5;
         let subtitleOpacity = 0.6;
 
-        function handleOpacityKeys(e) {
+        function handleTheaterModeKeys(e) {
             // Only in theater mode
             if (!document.body.classList.contains('theater-mode')) return;
 
-            const step = 0.1;
+            const step = 10; // pixels to move
+            const opacityStep = 0.1;
             const root = document.documentElement;
 
-            if (e.key === 'ArrowUp') {
+            // Ctrl + Arrow keys: Move subtitles
+            if (e.ctrlKey && (e.key.startsWith('Arrow'))) {
+                e.preventDefault();
+
+                // Get visible subtitle boxes
+                const subs = [
+                    document.getElementById('liveSub1'),
+                    document.getElementById('liveSub2'),
+                    document.getElementById('liveSub3')
+                ].filter(sub => sub.style.display !== 'none');
+
+                subs.forEach(sub => {
+                    const currentTop = parseInt(sub.style.top) || 0;
+                    const currentLeft = parseInt(sub.style.left) || 0;
+
+                    if (e.key === 'ArrowUp') {
+                        sub.style.top = (currentTop - step) + 'px';
+                    } else if (e.key === 'ArrowDown') {
+                        sub.style.top = (currentTop + step) + 'px';
+                    } else if (e.key === 'ArrowLeft') {
+                        sub.style.left = (currentLeft - step) + 'px';
+                    } else if (e.key === 'ArrowRight') {
+                        sub.style.left = (currentLeft + step) + 'px';
+                    }
+                });
+            }
+            // Shift + Arrow keys: Move chapter display
+            else if (e.shiftKey && (e.key.startsWith('Arrow'))) {
+                e.preventDefault();
+
+                const chapter = document.getElementById('currentChapterDisplay');
+                const currentTop = parseInt(chapter.style.top) || 20;
+                const currentLeft = parseInt(chapter.style.left) || 0;
+
+                if (e.key === 'ArrowUp') {
+                    chapter.style.top = (currentTop - step) + 'px';
+                } else if (e.key === 'ArrowDown') {
+                    chapter.style.top = (currentTop + step) + 'px';
+                } else if (e.key === 'ArrowLeft') {
+                    chapter.style.left = (currentLeft - step) + 'px';
+                } else if (e.key === 'ArrowRight') {
+                    chapter.style.left = (currentLeft + step) + 'px';
+                }
+            }
+            // Arrow keys alone: Control opacity
+            else if (e.key === 'ArrowUp' && !e.ctrlKey && !e.shiftKey) {
                 e.preventDefault();
                 // Increase opacity (darker)
-                chapterOpacity = Math.min(0.9, chapterOpacity + step);
-                subtitleOpacity = Math.min(0.9, subtitleOpacity + step);
+                chapterOpacity = Math.min(0.9, chapterOpacity + opacityStep);
+                subtitleOpacity = Math.min(0.9, subtitleOpacity + opacityStep);
                 root.style.setProperty('--chapter-opacity', chapterOpacity);
                 root.style.setProperty('--subtitle-opacity', subtitleOpacity);
-            } else if (e.key === 'ArrowDown') {
+            } else if (e.key === 'ArrowDown' && !e.ctrlKey && !e.shiftKey) {
                 e.preventDefault();
                 // Decrease opacity (lighter)
-                chapterOpacity = Math.max(0.1, chapterOpacity - step);
-                subtitleOpacity = Math.max(0.1, subtitleOpacity - step);
+                chapterOpacity = Math.max(0.1, chapterOpacity - opacityStep);
+                subtitleOpacity = Math.max(0.1, subtitleOpacity - opacityStep);
                 root.style.setProperty('--chapter-opacity', chapterOpacity);
                 root.style.setProperty('--subtitle-opacity', subtitleOpacity);
             }
@@ -1643,6 +1821,14 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             // Index file upload
             document.getElementById('indexFile').addEventListener('change', handleIndexUpload);
 
+            // Local video file selection - auto-trigger load
+            document.getElementById('localVideoFile').addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    // Auto-load when local video is selected
+                    loadConfiguration();
+                }
+            });
+
             // SRT file uploads
             document.getElementById('srtFile1').addEventListener('change', handleSRTUpload('srtFile1', 1));
             document.getElementById('srtFile2').addEventListener('change', handleSRTUpload('srtFile2', 2));
@@ -1677,7 +1863,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             makeDraggable(document.getElementById('liveSub3'));
 
             // Handle keyboard for opacity control
-            document.addEventListener('keydown', handleOpacityKeys);
+            document.addEventListener('keydown', handleTheaterModeKeys);
 
             // Load default configuration
             resetConfiguration();
