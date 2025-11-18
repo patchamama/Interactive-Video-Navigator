@@ -197,7 +197,7 @@
         body.theater-mode .subtitle-current {
             color: white;
             font-weight: 700;
-            font-size: 1.2rem;
+            font-size: var(--subtitle-font-size, 1.2rem);
         }
 
         body.theater-mode .col-lg-5,
@@ -400,7 +400,7 @@
         .subtitle-current {
             color: #2c3e50;
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: var(--subtitle-font-size, 0.95rem);
             padding: 6px 0;
         }
 
@@ -1345,16 +1345,17 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             // Check if local video file is selected
             if (localVideoInput.files && localVideoInput.files[0]) {
                 const file = localVideoInput.files[0];
-                const baseFilename = loadLocalVideo(file);
-
-                // Try to auto-load related files
-                autoLoadRelatedFiles(baseFilename);
+                loadLocalVideo(file);
 
                 // Parse index from textarea only if provided
-                if (indexContent !== DEFAULT_CONFIG.indexContent) {
+                if (indexContent && indexContent !== DEFAULT_CONFIG.indexContent) {
                     indexItems = parseIndex(indexContent);
                     renderIndex();
                 }
+
+                // Note: Auto-loading of .srt and .index files only works when running from a web server
+                // For file:// protocol, users need to manually upload subtitle and index files
+                console.log('Local video loaded. To auto-load subtitles and index, run from a web server (e.g., python -m http.server)');
             }
             // Otherwise, load YouTube video
             else {
@@ -1720,6 +1721,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
          */
         let chapterOpacity = 0.5;
         let subtitleOpacity = 0.6;
+        let subtitleFontSize = 1.2; // rem units
 
         function handleTheaterModeKeys(e) {
             // Only in theater mode
@@ -1788,6 +1790,48 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 subtitleOpacity = Math.max(0.1, subtitleOpacity - opacityStep);
                 root.style.setProperty('--chapter-opacity', chapterOpacity);
                 root.style.setProperty('--subtitle-opacity', subtitleOpacity);
+            }
+            // 'a' key: Increase subtitle font size
+            else if (e.key === 'a' || e.key === 'A') {
+                e.preventDefault();
+                subtitleFontSize = Math.min(3.0, subtitleFontSize + 0.1);
+                root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
+                console.log('Subtitle font size:', subtitleFontSize + 'rem');
+            }
+            // 'z' key: Decrease subtitle font size
+            else if (e.key === 'z' || e.key === 'Z') {
+                e.preventDefault();
+                subtitleFontSize = Math.max(0.5, subtitleFontSize - 0.1);
+                root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
+                console.log('Subtitle font size:', subtitleFontSize + 'rem');
+            }
+        }
+
+        /**
+         * Handle global keyboard controls (works outside theater mode too)
+         */
+        function handleGlobalKeys(e) {
+            const root = document.documentElement;
+
+            // 'a' key: Increase subtitle font size (works in any mode)
+            if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                // Only if not typing in an input
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    subtitleFontSize = Math.min(3.0, subtitleFontSize + 0.1);
+                    root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
+                    console.log('Subtitle font size:', subtitleFontSize + 'rem');
+                }
+            }
+            // 'z' key: Decrease subtitle font size (works in any mode)
+            else if ((e.key === 'z' || e.key === 'Z') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                // Only if not typing in an input
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    subtitleFontSize = Math.max(0.5, subtitleFontSize - 0.1);
+                    root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
+                    console.log('Subtitle font size:', subtitleFontSize + 'rem');
+                }
             }
         }
 
@@ -1886,8 +1930,11 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             makeDraggable(document.getElementById('liveSub2'));
             makeDraggable(document.getElementById('liveSub3'));
 
-            // Handle keyboard for opacity control
+            // Handle keyboard for theater mode (positioning, opacity)
             document.addEventListener('keydown', handleTheaterModeKeys);
+
+            // Handle global keyboard controls (font size with a/z keys)
+            document.addEventListener('keydown', handleGlobalKeys);
 
             // Load default configuration
             resetConfiguration();
