@@ -526,7 +526,7 @@
                                 <p class="mb-0">Navigate through video content with intelligent indexing and subtitle search</p>
                             </div>
                             <div class="text-end">
-                                <small class="opacity-75" style="font-size: 0.75rem;">v2.2.0</small>
+                                <small class="opacity-75" style="font-size: 0.75rem;">v2.2.1</small>
                             </div>
                         </div>
                     </div>
@@ -747,7 +747,7 @@
         // ============================================
         // APPLICATION VERSION
         // ============================================
-        const APP_VERSION = '2.2.0';
+        const APP_VERSION = '2.2.1';
 
         // ============================================
         // DEFAULT CONFIGURATION
@@ -1444,79 +1444,121 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
          * Load configuration
          */
         function loadConfiguration() {
-            const videoUrl = document.getElementById('videoUrl').value;
+            const videoUrl = document.getElementById('videoUrl').value.trim();
             const localVideoInput = document.getElementById('localVideoFile');
             const indexContent = document.getElementById('indexContent').value || DEFAULT_CONFIG.indexContent;
 
             console.log('=== Loading Configuration ===');
             console.log('Video URL input:', videoUrl);
 
-            // Check if videoUrl contains file:// protocol
-            if (videoUrl && videoUrl.startsWith('file://')) {
-                console.log('Detected file:// URL in video URL input');
-                loadLocalVideoFromURL(videoUrl);
+            let videoLoaded = false;
 
-                // Parse index from textarea only if provided
-                if (indexContent && indexContent !== DEFAULT_CONFIG.indexContent) {
-                    console.log('Loading index content from textarea');
-                    indexItems = parseIndex(indexContent);
-                    renderIndex();
-                }
-
-                // Note: Auto-loading of .srt and .index files only works when running from a web server
-                console.log('ℹ Note: Auto-loading of .srt and .index files only works when running from a web server');
-                console.log('  For file:// protocol, please manually upload subtitle and index files');
-            }
-            // Check if local video file is selected via file input
-            else if (localVideoInput.files && localVideoInput.files[0]) {
+            // Priority 1: Check if local video file is selected via file input
+            if (localVideoInput.files && localVideoInput.files[0]) {
                 const file = localVideoInput.files[0];
-                console.log('Local video file selected via file input:', file.name);
-
+                console.log('✓ Local video file selected via file input:', file.name);
                 loadLocalVideo(file);
-
-                // Parse index from textarea only if provided
-                if (indexContent && indexContent !== DEFAULT_CONFIG.indexContent) {
-                    console.log('Loading index content from textarea');
-                    indexItems = parseIndex(indexContent);
-                    renderIndex();
-                }
-
-                // Note: Auto-loading of .srt and .index files only works when running from a web server
-                console.log('ℹ Note: Auto-loading of .srt and .index files only works when running from a web server');
-                console.log('  Run: python3 -m http.server 8000');
+                videoLoaded = true;
             }
-            // Otherwise, load YouTube video
-            else {
-                console.log('Loading YouTube video');
-                const urlToUse = videoUrl || DEFAULT_CONFIG.videoUrl;
-                const videoId = getYouTubeVideoId(urlToUse);
+            // Priority 2: Check if videoUrl is provided
+            else if (videoUrl) {
+                // Check if it's a file:// URL
+                if (videoUrl.startsWith('file://')) {
+                    console.log('✓ Detected file:// URL');
+                    loadLocalVideoFromURL(videoUrl);
+                    videoLoaded = true;
+                }
+                // Check if it's a YouTube URL
+                else if (getYouTubeVideoId(videoUrl)) {
+                    console.log('✓ Detected YouTube URL');
+                    const videoId = getYouTubeVideoId(videoUrl);
+                    loadYouTubePlayer(videoId);
+                    videoLoaded = true;
 
-                if (!videoId) {
-                    alert('Please provide a valid YouTube URL or select a local video file');
+                    // Start subtitle synchronization if any subtitles are loaded
+                    if (srtData1.length > 0 || srtData2.length > 0 || srtData3.length > 0) {
+                        setTimeout(() => {
+                            startSubtitleSync();
+                        }, 2000); // Wait 2 seconds for YouTube iframe to be ready
+                    }
+                }
+                // Check if it's a direct video URL (http/https .mp4, .mkv, etc.)
+                else if (videoUrl.match(/^https?:\/\/.+\.(mp4|mkv|webm|ogg|avi|mov)(\?.*)?$/i)) {
+                    console.log('✓ Detected direct video URL (HTTP/HTTPS)');
+                    loadLocalVideoFromURL(videoUrl);
+                    videoLoaded = true;
+                }
+                else {
+                    console.error('✗ Invalid URL format');
+                    alert('URL no válida. Por favor proporciona:\n\n• URL de YouTube: https://www.youtube.com/watch?v=...\n• URL file://: file:///ruta/al/video.mp4\n• URL directa: https://ejemplo.com/video.mp4\n• O selecciona un archivo local');
                     return;
                 }
+            }
+            // Priority 3: Try to use default configuration
+            else {
+                console.log('⚠ No video URL or file provided, attempting to use default');
+                const defaultUrl = DEFAULT_CONFIG.videoUrl;
 
-                // Load YouTube video
-                loadYouTubePlayer(videoId);
+                // Check what type of URL is the default
+                if (defaultUrl.startsWith('file://')) {
+                    console.log('✓ Default is file:// URL');
+                    loadLocalVideoFromURL(defaultUrl);
+                    videoLoaded = true;
+                }
+                else if (getYouTubeVideoId(defaultUrl)) {
+                    console.log('✓ Default is YouTube URL');
+                    const videoId = getYouTubeVideoId(defaultUrl);
+                    loadYouTubePlayer(videoId);
+                    videoLoaded = true;
 
-                // Parse index
-                indexItems = parseIndex(indexContent);
-                renderIndex();
-
-                // Start subtitle synchronization if any subtitles are loaded
-                if (srtData1.length > 0 || srtData2.length > 0 || srtData3.length > 0) {
-                    setTimeout(() => {
-                        startSubtitleSync();
-                    }, 2000); // Wait 2 seconds for iframe to be ready
+                    // Start subtitle synchronization if any subtitles are loaded
+                    if (srtData1.length > 0 || srtData2.length > 0 || srtData3.length > 0) {
+                        setTimeout(() => {
+                            startSubtitleSync();
+                        }, 2000);
+                    }
+                }
+                else if (defaultUrl.match(/^https?:\/\/.+\.(mp4|mkv|webm|ogg|avi|mov)(\?.*)?$/i)) {
+                    console.log('✓ Default is direct video URL');
+                    loadLocalVideoFromURL(defaultUrl);
+                    videoLoaded = true;
+                }
+                else {
+                    console.error('✗ No valid video source provided');
+                    alert('Por favor proporciona un URL de video válido o selecciona un archivo local');
+                    return;
                 }
             }
 
-            // Show success message
-            const stats = document.getElementById('stats');
-            stats.innerHTML += '<div class="alert alert-success mt-2">Configuration loaded successfully!</div>';
-            setTimeout(() => {
-                stats.querySelector('.alert')?.remove();
-            }, 3000);
+            // Parse index if video was loaded successfully
+            if (videoLoaded) {
+                // Parse index from textarea only if provided and different from default
+                if (indexContent && indexContent !== DEFAULT_CONFIG.indexContent) {
+                    console.log('Loading custom index content');
+                    indexItems = parseIndex(indexContent);
+                    renderIndex();
+                }
+                // Use default index if using default video
+                else if (!videoUrl && indexContent === DEFAULT_CONFIG.indexContent) {
+                    console.log('Loading default index content');
+                    indexItems = parseIndex(indexContent);
+                    renderIndex();
+                }
+
+                // Note about auto-loading files
+                if (videoUrl && (videoUrl.startsWith('file://') || (localVideoInput.files && localVideoInput.files[0]))) {
+                    console.log('ℹ Note: Auto-loading of .srt and .index files only works when running from a web server');
+                    console.log('  For file:// protocol, please manually upload subtitle and index files');
+                    console.log('  Run a web server: python3 -m http.server 8000');
+                }
+
+                // Show success message
+                const stats = document.getElementById('stats');
+                stats.innerHTML += '<div class="alert alert-success mt-2">¡Configuración cargada con éxito!</div>';
+                setTimeout(() => {
+                    stats.querySelector('.alert')?.remove();
+                }, 3000);
+            }
 
             console.log('=== Configuration Load Complete ===');
         }
