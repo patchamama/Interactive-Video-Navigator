@@ -1219,8 +1219,12 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
          * Load local video file with HTML5 player
          */
         function loadLocalVideo(file) {
+            console.log('Loading local video:', file.name, 'Type:', file.type);
+
             const container = document.getElementById('videoContainer');
             const videoURL = URL.createObjectURL(file);
+
+            console.log('Video URL created:', videoURL);
 
             // Create HTML5 video player
             container.innerHTML = `
@@ -1232,6 +1236,9 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
             // Set up global player reference for compatibility
             const videoElement = document.getElementById('localPlayer');
+
+            console.log('Video element created:', videoElement);
+
             player = {
                 seekTo: function(seconds) {
                     videoElement.currentTime = seconds;
@@ -1254,13 +1261,14 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
             // Start subtitle sync when video is ready
             videoElement.addEventListener('loadedmetadata', function() {
-                console.log('Local video loaded, starting subtitle sync');
+                console.log('✓ Local video metadata loaded. Duration:', videoElement.duration);
+                console.log('✓ Starting subtitle synchronization...');
                 startSubtitleSync();
             });
 
             // Also start sync when video starts playing
             videoElement.addEventListener('play', function() {
-                console.log('Local video playing');
+                console.log('✓ Local video playing');
                 startSubtitleSync();
             });
 
@@ -1268,6 +1276,14 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             videoElement.addEventListener('pause', function() {
                 console.log('Local video paused');
             });
+
+            // Error handling
+            videoElement.addEventListener('error', function(e) {
+                console.error('✗ Error loading video:', e);
+                console.error('Video error code:', videoElement.error ? videoElement.error.code : 'unknown');
+            });
+
+            console.log('✓ Local video player setup complete');
 
             return file.name.replace(/\.[^/.]+$/, ""); // Return filename without extension
         }
@@ -1342,23 +1358,30 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             const localVideoInput = document.getElementById('localVideoFile');
             const indexContent = document.getElementById('indexContent').value || DEFAULT_CONFIG.indexContent;
 
+            console.log('=== Loading Configuration ===');
+
             // Check if local video file is selected
             if (localVideoInput.files && localVideoInput.files[0]) {
                 const file = localVideoInput.files[0];
+                console.log('Local video file selected:', file.name);
+
                 loadLocalVideo(file);
 
                 // Parse index from textarea only if provided
                 if (indexContent && indexContent !== DEFAULT_CONFIG.indexContent) {
+                    console.log('Loading index content from textarea');
                     indexItems = parseIndex(indexContent);
                     renderIndex();
                 }
 
                 // Note: Auto-loading of .srt and .index files only works when running from a web server
                 // For file:// protocol, users need to manually upload subtitle and index files
-                console.log('Local video loaded. To auto-load subtitles and index, run from a web server (e.g., python -m http.server)');
+                console.log('ℹ Note: Auto-loading of .srt and .index files only works when running from a web server');
+                console.log('  Run: python3 -m http.server 8000');
             }
             // Otherwise, load YouTube video
             else {
+                console.log('Loading YouTube video');
                 const urlToUse = videoUrl || DEFAULT_CONFIG.videoUrl;
                 const videoId = getYouTubeVideoId(urlToUse);
 
@@ -1388,6 +1411,8 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             setTimeout(() => {
                 stats.querySelector('.alert')?.remove();
             }, 3000);
+
+            console.log('=== Configuration Load Complete ===');
         }
         
         /**
@@ -1721,7 +1746,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
          */
         let chapterOpacity = 0.5;
         let subtitleOpacity = 0.6;
-        let subtitleFontSize = 1.2; // rem units
+        let subtitleFontSize = 1.2; // rem units for theater mode
 
         function handleTheaterModeKeys(e) {
             // Only in theater mode
@@ -1729,6 +1754,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
             const step = 10; // pixels to move
             const opacityStep = 0.1;
+            const fontSizeStep = 0.2; // Increased for more visible changes
             const root = document.documentElement;
 
             // Ctrl+Shift + Arrow keys: Move chapter display
@@ -1791,46 +1817,33 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                 root.style.setProperty('--chapter-opacity', chapterOpacity);
                 root.style.setProperty('--subtitle-opacity', subtitleOpacity);
             }
-            // 'a' key: Increase subtitle font size
-            else if (e.key === 'a' || e.key === 'A') {
-                e.preventDefault();
-                subtitleFontSize = Math.min(3.0, subtitleFontSize + 0.1);
-                root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
-                console.log('Subtitle font size:', subtitleFontSize + 'rem');
-            }
-            // 'z' key: Decrease subtitle font size
-            else if (e.key === 'z' || e.key === 'Z') {
-                e.preventDefault();
-                subtitleFontSize = Math.max(0.5, subtitleFontSize - 0.1);
-                root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
-                console.log('Subtitle font size:', subtitleFontSize + 'rem');
-            }
         }
 
         /**
-         * Handle global keyboard controls (works outside theater mode too)
+         * Handle global keyboard controls (works in all modes)
          */
         function handleGlobalKeys(e) {
             const root = document.documentElement;
+            const fontSizeStep = 0.2; // Larger increment for visible changes
 
-            // 'a' key: Increase subtitle font size (works in any mode)
-            if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            // 'a' or 'A' key: Increase subtitle font size (works in any mode)
+            if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
                 // Only if not typing in an input
                 if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
                     e.preventDefault();
-                    subtitleFontSize = Math.min(3.0, subtitleFontSize + 0.1);
+                    subtitleFontSize = Math.min(4.0, subtitleFontSize + fontSizeStep);
                     root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
-                    console.log('Subtitle font size:', subtitleFontSize + 'rem');
+                    console.log('✓ Subtitle font size increased:', subtitleFontSize.toFixed(1) + 'rem');
                 }
             }
-            // 'z' key: Decrease subtitle font size (works in any mode)
-            else if ((e.key === 'z' || e.key === 'Z') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            // 'z' or 'Z' key: Decrease subtitle font size (works in any mode)
+            else if ((e.key === 'z' || e.key === 'Z') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
                 // Only if not typing in an input
                 if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
                     e.preventDefault();
-                    subtitleFontSize = Math.max(0.5, subtitleFontSize - 0.1);
+                    subtitleFontSize = Math.max(0.6, subtitleFontSize - fontSizeStep);
                     root.style.setProperty('--subtitle-font-size', subtitleFontSize + 'rem');
-                    console.log('Subtitle font size:', subtitleFontSize + 'rem');
+                    console.log('✓ Subtitle font size decreased:', subtitleFontSize.toFixed(1) + 'rem');
                 }
             }
         }
