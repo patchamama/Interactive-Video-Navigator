@@ -116,11 +116,10 @@
         }
 
         body.theater-mode .current-chapter-box {
-            background: rgba(0, 0, 0, var(--chapter-opacity, 0.5));
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-            border: 2px solid rgba(0, 0, 0, var(--chapter-opacity, 0.5));
-            border-left: 4px solid rgba(33, 150, 243, 0.8);
-            backdrop-filter: blur(10px);
+            background: transparent;
+            box-shadow: none;
+            border: none;
+            backdrop-filter: none;
             color: white;
             padding: 12px 20px;
             cursor: move;
@@ -128,15 +127,23 @@
         }
 
         body.theater-mode .chapter-label {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.7rem;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            display: none;
         }
 
         body.theater-mode .chapter-text {
             color: white;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 1);
-            font-size: 1rem;
+            text-shadow:
+                -3px -3px 0 #000,
+                3px -3px 0 #000,
+                -3px 3px 0 #000,
+                3px 3px 0 #000,
+                -3px 0 0 #000,
+                3px 0 0 #000,
+                0 -3px 0 #000,
+                0 3px 0 #000,
+                0 0 12px rgba(0, 0, 0, 1);
+            font-size: 1.2rem;
+            font-weight: 700;
         }
 
         /* Subtitles as overlay at bottom */
@@ -153,10 +160,10 @@
         /* Subtitle boxes styling in theater mode */
         body.theater-mode .live-subtitle-box {
             pointer-events: auto;
-            background: rgba(0, 0, 0, var(--subtitle-opacity, 0.6));
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(0, 0, 0, var(--subtitle-opacity, 0.6));
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+            background: transparent;
+            backdrop-filter: none;
+            border: none;
+            box-shadow: none;
             margin-top: 10px;
             padding: 8px 16px;
             cursor: move;
@@ -547,17 +554,16 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold"><i class="bi bi-film"></i> Local Video File</label>
-                                    <input type="file" class="form-control" id="localVideoFile" accept="video/*">
+                                    <input type="file" class="form-control" id="localVideoFile" accept=".mp4,.mkv,video/*">
                                     <small class="text-muted">Auto-loads matching .srt and .index files</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold"><i class="bi bi-upload"></i> Upload Index File (Optional)</label>
                                     <input type="file" class="form-control" id="indexFile" accept=".txt,.index,.md">
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-bold"><i class="bi bi-list-ol"></i> Index Content (Markdown format with timestamps)</label>
-                                    <textarea class="form-control" id="indexContent" rows="5" placeholder="Paste your index here with timestamps in format [HH:MM:SS] or (HH:MM:SS)"></textarea>
-                                </div>
+
+                                <!-- Hidden textarea for index content (used by JavaScript) -->
+                                <textarea id="indexContent" style="display:none;"></textarea>
 
                                 <!-- Subtitle Files Section -->
                                 <div class="col-12">
@@ -1705,8 +1711,8 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             const opacityStep = 0.1;
             const root = document.documentElement;
 
-            // Ctrl + Arrow keys: Move subtitles
-            if (e.ctrlKey && (e.key.startsWith('Arrow'))) {
+            // Shift + Arrow keys: Move subtitles
+            if (e.shiftKey && (e.key.startsWith('Arrow'))) {
                 e.preventDefault();
 
                 // Get visible subtitle boxes
@@ -1730,24 +1736,6 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
                         sub.style.left = (currentLeft + step) + 'px';
                     }
                 });
-            }
-            // Shift + Arrow keys: Move chapter display
-            else if (e.shiftKey && (e.key.startsWith('Arrow'))) {
-                e.preventDefault();
-
-                const chapter = document.getElementById('currentChapterDisplay');
-                const currentTop = parseInt(chapter.style.top) || 20;
-                const currentLeft = parseInt(chapter.style.left) || 0;
-
-                if (e.key === 'ArrowUp') {
-                    chapter.style.top = (currentTop - step) + 'px';
-                } else if (e.key === 'ArrowDown') {
-                    chapter.style.top = (currentTop + step) + 'px';
-                } else if (e.key === 'ArrowLeft') {
-                    chapter.style.left = (currentLeft - step) + 'px';
-                } else if (e.key === 'ArrowRight') {
-                    chapter.style.left = (currentLeft + step) + 'px';
-                }
             }
             // Arrow keys alone: Control opacity
             else if (e.key === 'ArrowUp' && !e.ctrlKey && !e.shiftKey) {
