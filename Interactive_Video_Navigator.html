@@ -1224,7 +1224,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             const container = document.getElementById('videoContainer');
             const videoURL = URL.createObjectURL(file);
 
-            console.log('Video URL created:', videoURL);
+            console.log('Video Blob URL created:', videoURL);
 
             // Create HTML5 video player
             container.innerHTML = `
@@ -1238,6 +1238,8 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             const videoElement = document.getElementById('localPlayer');
 
             console.log('Video element created:', videoElement);
+            console.log('Video element src:', videoElement.src);
+            console.log('Video source element src:', videoElement.querySelector('source')?.src);
 
             player = {
                 seekTo: function(seconds) {
@@ -1262,6 +1264,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             // Start subtitle sync when video is ready
             videoElement.addEventListener('loadedmetadata', function() {
                 console.log('✓ Local video metadata loaded. Duration:', videoElement.duration);
+                console.log('✓ Video currentSrc:', videoElement.currentSrc);
                 console.log('✓ Starting subtitle synchronization...');
                 startSubtitleSync();
             });
@@ -1281,6 +1284,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             videoElement.addEventListener('error', function(e) {
                 console.error('✗ Error loading video:', e);
                 console.error('Video error code:', videoElement.error ? videoElement.error.code : 'unknown');
+                console.error('Video error message:', videoElement.error ? videoElement.error.message : 'none');
             });
 
             console.log('✓ Local video player setup complete');
