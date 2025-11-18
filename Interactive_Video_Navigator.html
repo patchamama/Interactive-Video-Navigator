@@ -143,22 +143,28 @@
         body.theater-mode #liveSubtitlesContainer {
             position: fixed;
             bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 0;
+            right: 0;
             z-index: 10001;
-            width: 90%;
-            max-width: 1200px;
+            text-align: center;
+            pointer-events: none;
         }
 
+        /* Subtitle boxes styling in theater mode */
         body.theater-mode .live-subtitle-box {
+            pointer-events: auto;
             background: rgba(0, 0, 0, var(--subtitle-opacity, 0.6));
             backdrop-filter: blur(10px);
             border: 2px solid rgba(0, 0, 0, var(--subtitle-opacity, 0.6));
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
             margin-top: 10px;
-            padding: 12px 20px;
+            padding: 8px 16px;
             cursor: move;
             user-select: none;
+            width: auto;
+            display: inline-block;
+            max-width: 90%;
+            position: relative;
         }
 
         body.theater-mode .subtitle-line {
@@ -171,10 +177,10 @@
             color: white;
         }
 
+        /* Hide previous and next lines in theater mode */
         body.theater-mode .subtitle-previous,
         body.theater-mode .subtitle-next {
-            color: rgba(255, 255, 255, 0.7);
-            opacity: 0.8;
+            display: none;
         }
 
         body.theater-mode .subtitle-current {
@@ -586,6 +592,37 @@
                                             <i class="bi bi-eye"></i> Show Subtitle 3
                                         </label>
                                     </div>
+
+                                    <!-- Subtitle Sync Controls -->
+                                    <div class="mt-3">
+                                        <label class="form-label"><i class="bi bi-clock-history"></i> Subtitle Synchronization (milliseconds)</label>
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">Sub 1</span>
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="adjustSubtitleSync(1, -100)">-100ms</button>
+                                                    <input type="number" class="form-control text-center" id="syncOffset1" value="0" step="100" style="max-width: 80px;">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="adjustSubtitleSync(1, 100)">+100ms</button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">Sub 2</span>
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="adjustSubtitleSync(2, -100)">-100ms</button>
+                                                    <input type="number" class="form-control text-center" id="syncOffset2" value="0" step="100" style="max-width: 80px;">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="adjustSubtitleSync(2, 100)">+100ms</button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">Sub 3</span>
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="adjustSubtitleSync(3, -100)">-100ms</button>
+                                                    <input type="number" class="form-control text-center" id="syncOffset3" value="0" step="100" style="max-width: 80px;">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="adjustSubtitleSync(3, 100)">+100ms</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-12">
@@ -696,7 +733,7 @@
         // DEFAULT CONFIGURATION
         // ============================================
         const DEFAULT_CONFIG = {
-            videoUrl: 'https://www.youtube.com/watch?v=ZT9FunQCcSI',
+            videoUrl: 'https://www.youtube.com/watch?v=FfcHXFGcYxQ',
             indexContent: `PART 1: INTRODUCTION AND INITIAL SETUP (00:02:00 - 01:10:00)
 - [00:02:00] Welcome and initial greetings
 - [00:05:45] Discussion about workflows and technical documentation
@@ -731,7 +768,12 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         let currentVideoId = null;
         let subtitleSyncInterval = null; // Interval for subtitle synchronization
         let youtubeAPIReady = false; // Flag to track if YouTube API is loaded
-        
+
+        // Subtitle synchronization offsets (in milliseconds)
+        let syncOffset1 = 0;
+        let syncOffset2 = 0;
+        let syncOffset3 = 0;
+
         // ============================================
         // UTILITY FUNCTIONS
         // ============================================
@@ -1273,6 +1315,26 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         }
 
         /**
+         * Adjust subtitle synchronization offset
+         */
+        function adjustSubtitleSync(subtitleNumber, milliseconds) {
+            const offsetInput = document.getElementById(`syncOffset${subtitleNumber}`);
+            const currentValue = parseInt(offsetInput.value) || 0;
+            const newValue = currentValue + milliseconds;
+
+            offsetInput.value = newValue;
+
+            // Update global offset variable
+            if (subtitleNumber === 1) {
+                syncOffset1 = newValue;
+            } else if (subtitleNumber === 2) {
+                syncOffset2 = newValue;
+            } else if (subtitleNumber === 3) {
+                syncOffset3 = newValue;
+            }
+        }
+
+        /**
          * Update subtitle visibility based on checkboxes and available data
          */
         function updateLiveSubtitleVisibility() {
@@ -1307,16 +1369,19 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         /**
          * Get current subtitle with previous and next lines
          */
-        function getCurrentSubtitle(srtArray, currentTime) {
+        function getCurrentSubtitle(srtArray, currentTime, offsetMs = 0) {
             if (!srtArray || srtArray.length === 0) {
                 return { previous: '', current: '', next: '' };
             }
 
+            // Apply sync offset (convert milliseconds to seconds)
+            const adjustedTime = currentTime + (offsetMs / 1000);
+
             // Find the index of the subtitle that should be playing now
-            // Use the last subtitle that has passed (time <= currentTime)
+            // Use the last subtitle that has passed (time <= adjustedTime)
             let currentIndex = -1;
             for (let i = srtArray.length - 1; i >= 0; i--) {
-                if (currentTime >= srtArray[i].time) {
+                if (adjustedTime >= srtArray[i].time) {
                     currentIndex = i;
                     break;
                 }
@@ -1345,7 +1410,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
         function updateLiveSubtitles(currentTime) {
             // Update subtitle 1
             if (srtData1.length > 0 && document.getElementById('showSub1').checked) {
-                const lines = getCurrentSubtitle(srtData1, currentTime);
+                const lines = getCurrentSubtitle(srtData1, currentTime, syncOffset1);
                 document.getElementById('liveSubText1Prev').textContent = lines.previous;
                 document.getElementById('liveSubText1').textContent = lines.current;
                 document.getElementById('liveSubText1Next').textContent = lines.next;
@@ -1353,7 +1418,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
             // Update subtitle 2
             if (srtData2.length > 0 && document.getElementById('showSub2').checked) {
-                const lines = getCurrentSubtitle(srtData2, currentTime);
+                const lines = getCurrentSubtitle(srtData2, currentTime, syncOffset2);
                 document.getElementById('liveSubText2Prev').textContent = lines.previous;
                 document.getElementById('liveSubText2').textContent = lines.current;
                 document.getElementById('liveSubText2Next').textContent = lines.next;
@@ -1361,7 +1426,7 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
 
             // Update subtitle 3
             if (srtData3.length > 0 && document.getElementById('showSub3').checked) {
-                const lines = getCurrentSubtitle(srtData3, currentTime);
+                const lines = getCurrentSubtitle(srtData3, currentTime, syncOffset3);
                 document.getElementById('liveSubText3Prev').textContent = lines.previous;
                 document.getElementById('liveSubText3').textContent = lines.current;
                 document.getElementById('liveSubText3Next').textContent = lines.next;
@@ -1606,8 +1671,10 @@ PART 3: POST-INSTALLATION (03:08:40 - 04:40:00)
             // Make chapter display draggable
             makeDraggable(document.getElementById('currentChapterDisplay'));
 
-            // Make subtitle containers draggable
-            makeDraggable(document.getElementById('liveSubtitlesContainer'));
+            // Make each subtitle box draggable
+            makeDraggable(document.getElementById('liveSub1'));
+            makeDraggable(document.getElementById('liveSub2'));
+            makeDraggable(document.getElementById('liveSub3'));
 
             // Handle keyboard for opacity control
             document.addEventListener('keydown', handleOpacityKeys);
