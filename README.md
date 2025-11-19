@@ -5,6 +5,10 @@ El objetivo de este proyecto es crear varias aplicaciones/herramientas relaciona
 - 1. [Traductor de Subtitulos usando traductores de navegador como gTranslator y Bing](./subtitles.show.html). Para que funcione, es necesario correr un servidor local como `php -s localhost:8000` o `python3 -m http.server 8000`
 - 2. [Interactive Video Navigator.html](./Interactive_Video_Navigator.html). Este visualizador permite visualizar videos de diferentes fuentes, como youtube o local en el ordenador, con hasta 3 subtitulos en diferentes idiomas y un índice de los apartados/capítulos de una forma visual agradable.
 - 3. Subtitulos - Sincronización (pendiente)
+ 
+### Tareas
+
+- Desplegar estos scripts en Github Deploy para no necesitar servidor local. 
 
 
  ### Pendiente para mejorar el 1. Traductor de subtitulos
