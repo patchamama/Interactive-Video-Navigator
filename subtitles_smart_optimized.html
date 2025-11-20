@@ -2231,13 +2231,13 @@
             const subordinateWords = [
                 // German
                 'weil', 'wenn', 'dass', 'ob', 'als', 'damit', 'obwohl', 'bevor', 'nachdem',
-                'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern',
+                'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'ok', 'okay',
                 // Spanish
                 'que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
-                'para que', 'ya que', 'pero', 'sino', 'o', 'y',
+                'para que', 'ya que', 'pero', 'sino', 'o', 'y', 'ok', 'okey',
                 // English
                 'that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
-                'since', 'unless', 'until', 'but', 'or', 'and', 'yet'
+                'since', 'unless', 'until', 'but', 'or', 'and', 'yet', 'ok', 'okay', 'okey'
             ];
 
             // Personal pronouns (for comma + pronoun detection)
@@ -2273,11 +2273,11 @@
                     let strategy = '';
 
                     // ============================================
-                    // SEARCH BACKWARDS FIRST (from MAX_LENGTH to 50% of MAX_LENGTH)
+                    // SEARCH BACKWARDS FIRST (from MAX_LENGTH to 25% of MAX_LENGTH)
                     // ============================================
 
                     // Strategy 1A: Search BACKWARDS for sentence terminator (.?!)
-                    for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
+                    for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.25; j--) {
                         if (/[.!?]/.test(remainingText[j])) {
                             splitPoint = j + 1; // Include the punctuation
                             strategy = 'sentence terminator (backward)';
@@ -2287,7 +2287,7 @@
 
                     // Strategy 1.5A: Search BACKWARDS for comma + personal pronoun
                     if (splitPoint === -1) {
-                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.25; j--) {
                             if (remainingText[j] === ',') {
                                 // Check if after comma there's a space and then a personal pronoun
                                 const afterComma = remainingText.substring(j + 1).trimStart();
@@ -2303,7 +2303,7 @@
 
                     // Strategy 2A: Search BACKWARDS for subordinate conjunction
                     if (splitPoint === -1) {
-                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.25; j--) {
                             if (remainingText[j] === ' ') {
                                 const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
                                 if (subordinateWords.includes(wordAfter)) {
