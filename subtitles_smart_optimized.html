@@ -1704,10 +1704,47 @@
 
             console.log(`✅ Join complete - reduced from ${subtitles.length} to ${joined.length} subtitles`);
 
+            // ============================================
+            // POST-PROCESSING: Merge subtitles with same start and end time
+            // ============================================
+            console.log('\n🔍 Post-processing: checking for subtitles with same start/end time...');
+
+            const finalJoined = [];
+            for (let idx = 0; idx < joined.length; idx++) {
+                const current = joined[idx];
+
+                // Check if start time equals end time (invisible subtitle)
+                if (current.startTime === current.endTime) {
+                    console.log(`  ⚠ Found invisible subtitle at index ${idx}: "${current.text.substring(0, 30)}..."`);
+
+                    // Merge with previous subtitle
+                    if (finalJoined.length > 0) {
+                        const previous = finalJoined[finalJoined.length - 1];
+                        previous.text = previous.text + ' ' + current.text;
+                        console.log(`  ✓ Merged with previous subtitle. New text: "${previous.text.substring(0, 50)}..."`);
+                    } else {
+                        // If it's the first subtitle, we can't merge with previous
+                        // Just add it as is (this should rarely happen)
+                        console.log(`  ⚠ Cannot merge (first subtitle), keeping as is`);
+                        finalJoined.push(current);
+                    }
+                } else {
+                    // Normal subtitle, add to final list
+                    finalJoined.push(current);
+                }
+            }
+
+            // Renumber subtitles after merging
+            finalJoined.forEach((sub, idx) => {
+                sub.number = idx + 1;
+            });
+
+            console.log(`✅ Post-processing complete - ${joined.length} → ${finalJoined.length} subtitles`);
+
             // Clear table and display joined subtitles
             tableBody.innerHTML = '';
 
-            joined.forEach(sub => {
+            finalJoined.forEach(sub => {
                 const row = tableBody.insertRow();
 
                 const cellNumber = row.insertCell(0);
@@ -1725,12 +1762,12 @@
             });
 
             // Update stats
-            document.getElementById('totalSubs').textContent = joined.length.toLocaleString();
+            document.getElementById('totalSubs').textContent = finalJoined.length.toLocaleString();
 
             // NOTE: We DO NOT update currentSubtitles here to preserve the original state
             // This allows reprocessSubtitles() to revert to the original when checkbox is unchecked
 
-            updateProcessingStatus('✅ Join complete!', `Reduced from ${subtitles.length} to ${joined.length} subtitles`);
+            updateProcessingStatus('✅ Join complete!', `Reduced from ${subtitles.length} to ${finalJoined.length} subtitles`);
             setTimeout(() => hideProcessingStatus(), 2000);
         }
 
