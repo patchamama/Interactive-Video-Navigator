@@ -662,7 +662,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.2 Status-Based</span>
+            <span class="version-badge">v3.3 Auto-End + Join</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -684,6 +684,10 @@
                     <label for="improveYouTubeSubs">YouTube</label>
                 </div>
                 <div class="stop-button-wrapper">
+                    <button id="joinSentencesButton" class="export-button" onclick="joinSentences()" disabled style="background: #ff9800;">
+                        <span>🔗</span>
+                        <span>Join Sentences</span>
+                    </button>
                     <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
                         <span>💾</span>
                         <span>Export SRT</span>
@@ -943,7 +947,18 @@
             const tableBody = document.getElementById('tableBody');
             const rows = tableBody.getElementsByTagName('tr');
 
+            // Check if we've reached the end (no more rows to check)
+            if (lastFoundIndex >= rows.length) {
+                console.log('\n🏁 END OF DOCUMENT - All rows checked');
+                console.log('💾 Exporting translated file...');
+                stopDOMComparison();
+                exportSRT();
+                stopAutoScroll();
+                return;
+            }
+
             // Search from lastFoundIndex onwards for the first unchanged status
+            let foundUnchanged = false;
             for (let i = lastFoundIndex; i < rows.length; i++) {
                 const statusCell = rows[i].cells[4];
                 if (!statusCell) continue;
@@ -960,6 +975,7 @@
                     // Move to this row
                     lastFoundIndex = i;
                     scrollToRow(i);
+                    foundUnchanged = true;
 
                     // Reset no-change timeout
                     if (noChangeTimeout) {
@@ -979,9 +995,9 @@
                 }
             }
 
-            // Reached the end of the document
-            if (lastFoundIndex >= rows.length - 1) {
-                console.log('\n🏁 END OF DOCUMENT - All rows checked');
+            // If we scanned all remaining rows and found no unchanged status, we're done
+            if (!foundUnchanged) {
+                console.log('\n🏁 END OF DOCUMENT - No more unchanged rows found');
                 console.log('💾 Exporting translated file...');
                 stopDOMComparison();
                 exportSRT();
@@ -1417,6 +1433,7 @@
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('exportButton').disabled = false;
             document.getElementById('toggleStatusColumn').disabled = false;
+            document.getElementById('joinSentencesButton').disabled = false;
             
             setTimeout(() => {
                 const firstRow = tbody.getElementsByTagName('tr')[0];
@@ -1425,6 +1442,139 @@
                     console.log('📍 Scrolled to first subtitle');
                 }
             }, 300);
+        }
+
+        function joinSentences() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles to process');
+                return;
+            }
+
+            showProcessingStatus('🔗 Joining sentences...', 'Processing subtitles');
+
+            // Extract current subtitles from table
+            const subtitles = [];
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                subtitles.push({
+                    number: cells[0].textContent,
+                    startTime: cells[1].textContent,
+                    endTime: cells[2].textContent,
+                    text: cells[3].innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim(),
+                    status: cells[4] ? cells[4].textContent : originalStatusText
+                });
+            }
+
+            console.log(`\n🔗 Starting Join Sentences - ${subtitles.length} subtitles`);
+
+            // Process sentences
+            const joined = [];
+            let i = 0;
+
+            while (i < subtitles.length) {
+                let currentText = subtitles[i].text;
+                const startTime = subtitles[i].startTime;
+                let endTime = subtitles[i].endTime;
+                const status = subtitles[i].status;
+
+                // Check if current line ends with sentence terminator
+                const endsWithTerminator = /[.!?]\.{0,2}\s*$/.test(currentText);
+
+                if (!endsWithTerminator && i < subtitles.length - 1) {
+                    // Join with following lines until we find a terminator
+                    let j = i + 1;
+                    while (j < subtitles.length) {
+                        currentText += ' ' + subtitles[j].text;
+                        endTime = subtitles[j].endTime;
+
+                        // Check if this line ends with terminator
+                        if (/[.!?]\.{0,2}\s*$/.test(subtitles[j].text)) {
+                            break;
+                        }
+                        j++;
+                    }
+
+                    console.log(`✓ Joined rows ${i + 1} to ${j + 1}`);
+
+                    // Now split by sentence terminators if there are multiple sentences
+                    const sentences = currentText.match(/[^.!?]+[.!?]\.{0,2}|[^.!?]+$/g);
+
+                    if (sentences && sentences.length > 1) {
+                        // Multiple sentences found - split them
+                        console.log(`  → Found ${sentences.length} sentences, splitting...`);
+
+                        for (let k = 0; k < sentences.length; k++) {
+                            const sentence = sentences[k].trim();
+                            if (sentence) {
+                                joined.push({
+                                    number: joined.length + 1,
+                                    startTime: k === 0 ? startTime : endTime,
+                                    endTime: endTime,
+                                    text: sentence,
+                                    status: status
+                                });
+                            }
+                        }
+                    } else {
+                        // Single sentence
+                        joined.push({
+                            number: joined.length + 1,
+                            startTime: startTime,
+                            endTime: endTime,
+                            text: currentText.trim(),
+                            status: status
+                        });
+                    }
+
+                    i = j + 1;
+                } else {
+                    // Line already ends with terminator or is last line
+                    joined.push({
+                        number: joined.length + 1,
+                        startTime: startTime,
+                        endTime: endTime,
+                        text: currentText.trim(),
+                        status: status
+                    });
+                    i++;
+                }
+            }
+
+            console.log(`✅ Join complete - reduced from ${subtitles.length} to ${joined.length} subtitles`);
+
+            // Clear table and display joined subtitles
+            tableBody.innerHTML = '';
+
+            joined.forEach(sub => {
+                const row = tableBody.insertRow();
+
+                const cellNumber = row.insertCell(0);
+                const cellStart = row.insertCell(1);
+                const cellEnd = row.insertCell(2);
+                const cellText = row.insertCell(3);
+                const cellStatus = row.insertCell(4);
+
+                cellNumber.textContent = sub.number;
+                cellStart.textContent = sub.startTime;
+                cellEnd.textContent = sub.endTime;
+                cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
+                cellStatus.textContent = sub.status;
+                cellStatus.className = 'cell-status';
+
+                // Apply status column visibility
+                if (!statusColumnVisible) {
+                    cellStatus.classList.add('status-hidden');
+                }
+            });
+
+            // Update stats
+            document.getElementById('totalSubs').textContent = joined.length.toLocaleString();
+
+            updateProcessingStatus('✅ Join complete!', `Reduced from ${subtitles.length} to ${joined.length} subtitles`);
+            setTimeout(() => hideProcessingStatus(), 2000);
         }
 
         function exportSRT() {
