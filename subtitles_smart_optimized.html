@@ -662,7 +662,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.4 Simplified UI</span>
+            <span class="version-badge">v3.5 Smart Abbreviations</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -1429,6 +1429,40 @@
 
             console.log(`\n🔗 Starting Join Sentences - ${subtitles.length} subtitles`);
 
+            // Common abbreviations that end with period but are NOT sentence endings
+            const abbreviations = [
+                'z\\.\\s*B',     // z. B. (German: zum Beispiel)
+                'p\\.\\s*ej',    // p. ej. (Spanish: por ejemplo)
+                'ej',            // ej. (Spanish: ejemplo)
+                'etc',           // etc.
+                'Dr',            // Dr.
+                'Sr',            // Sr.
+                'Sra',           // Sra.
+                'vs',            // vs.
+                'e\\.\\s*g',     // e.g.
+                'i\\.\\s*e',     // i.e.
+                'ca',            // ca. (circa)
+                'aprox',         // aprox.
+                'pág',           // pág.
+                'vol',           // vol.
+                'no',            // no. (number)
+                'núm'            // núm.
+            ];
+
+            // Create regex to detect real sentence endings (not abbreviations)
+            const abbrevPattern = `(?<!\\b(?:${abbreviations.join('|')}))\\.`;
+            const sentenceEndPattern = new RegExp(`${abbrevPattern}\\s*$|[!?]\.{0,2}\\s*$`);
+
+            // Helper function to check if text ends with real sentence terminator
+            function endsWithRealTerminator(text) {
+                // First check if ends with ! or ?
+                if (/[!?]\.{0,2}\s*$/.test(text)) {
+                    return true;
+                }
+                // Then check if ends with period that's not part of abbreviation
+                return sentenceEndPattern.test(text);
+            }
+
             // Process sentences
             const joined = [];
             let i = 0;
@@ -1440,7 +1474,7 @@
                 const status = subtitles[i].status;
 
                 // Check if current line ends with sentence terminator
-                const endsWithTerminator = /[.!?]\.{0,2}\s*$/.test(currentText);
+                const endsWithTerminator = endsWithRealTerminator(currentText);
 
                 if (!endsWithTerminator && i < subtitles.length - 1) {
                     // Join with following lines until we find a terminator
@@ -1450,7 +1484,7 @@
                         endTime = subtitles[j].endTime;
 
                         // Check if this line ends with terminator
-                        if (/[.!?]\.{0,2}\s*$/.test(subtitles[j].text)) {
+                        if (endsWithRealTerminator(subtitles[j].text)) {
                             break;
                         }
                         j++;
@@ -1458,10 +1492,39 @@
 
                     console.log(`✓ Joined rows ${i + 1} to ${j + 1}`);
 
-                    // Now split by sentence terminators if there are multiple sentences
-                    const sentences = currentText.match(/[^.!?]+[.!?]\.{0,2}|[^.!?]+$/g);
+                    // Split by real sentence terminators (respecting abbreviations)
+                    // This is a simple approach - just keep as one sentence if it contains abbreviations
+                    const sentences = [];
+                    let tempSentence = '';
+                    const parts = currentText.split(/([.!?]\.{0,2})/);
 
-                    if (sentences && sentences.length > 1) {
+                    for (let k = 0; k < parts.length; k++) {
+                        const part = parts[k];
+                        tempSentence += part;
+
+                        // Check if this is a terminator and not part of abbreviation
+                        if (/^[.!?]\.{0,2}$/.test(part)) {
+                            // Check if the sentence before this terminator ends with abbreviation
+                            const beforeTerminator = tempSentence.substring(0, tempSentence.length - part.length).trim();
+                            const isAbbrev = abbreviations.some(abbr => {
+                                const regex = new RegExp(`\\b${abbr}\\.?\\s*$`, 'i');
+                                return regex.test(beforeTerminator);
+                            });
+
+                            if (!isAbbrev) {
+                                // Real sentence end
+                                sentences.push(tempSentence.trim());
+                                tempSentence = '';
+                            }
+                        }
+                    }
+
+                    // Add remaining text as last sentence
+                    if (tempSentence.trim()) {
+                        sentences.push(tempSentence.trim());
+                    }
+
+                    if (sentences.length > 1) {
                         // Multiple sentences found - split them
                         console.log(`  → Found ${sentences.length} sentences, splitting...`);
 
