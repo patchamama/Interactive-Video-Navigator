@@ -1682,6 +1682,7 @@
                     // Join with following lines until we find a terminator
                     let j = i + 1;
                     let linesJoined = 1; // Count of lines joined (starting with 1 for current line)
+                    const originalSubtitles = [subtitles[i]]; // Keep track of original subtitles being joined
 
                     while (j < subtitles.length) {
                         const nextLineText = subtitles[j].text;
@@ -1696,6 +1697,7 @@
 
                         currentText += ' ' + nextLineText;
                         endTime = subtitles[j].endTime;
+                        originalSubtitles.push(subtitles[j]); // Track original subtitle
                         linesJoined++;
 
                         // Check if this line ends with terminator
@@ -1706,6 +1708,7 @@
                     }
 
                     console.log(`✓ Joined rows ${i + 1} to ${j + 1} (${linesJoined} lines)`);
+                    console.log(`  Original time slots:`, originalSubtitles.map(s => `${s.startTime}-${s.endTime}`).join(', '));
 
                     // Split by real sentence terminators (respecting abbreviations)
                     const sentences = [];
@@ -1774,25 +1777,53 @@
                         console.log(`  → Found ${sentences.length} sentences, splitting...`);
 
                         // Calculate proportional time distribution based on sentence length
+                        // Using the original subtitle time slots for better accuracy
                         const totalTextLength = sentences.reduce((sum, s) => sum + s.length, 0);
 
-                        // Convert time strings to seconds for calculation
-                        const startSeconds = timeToSeconds(startTime);
-                        const endSeconds = timeToSeconds(endTime);
-                        const totalDuration = endSeconds - startSeconds;
+                        // Calculate time slots from original subtitles
+                        const timeSlots = originalSubtitles.map(sub => ({
+                            startSeconds: timeToSeconds(sub.startTime),
+                            endSeconds: timeToSeconds(sub.endTime),
+                            duration: timeToSeconds(sub.endTime) - timeToSeconds(sub.startTime)
+                        }));
+
+                        const totalDuration = timeSlots.reduce((sum, slot) => sum + slot.duration, 0);
+                        const globalStartSeconds = timeSlots[0].startSeconds;
+                        const globalEndSeconds = timeSlots[timeSlots.length - 1].endSeconds;
 
                         let currentTimeOffset = 0;
+                        const MIN_DURATION = 0.1; // Minimum 100ms duration for any subtitle
+
                         for (let k = 0; k < sentences.length; k++) {
                             const sentence = sentences[k].trim();
                             if (sentence) {
                                 // Calculate this sentence's proportion of total time
                                 const sentenceLength = sentence.length;
-                                const proportionalDuration = (sentenceLength / totalTextLength) * totalDuration;
+                                let proportionalDuration = (sentenceLength / totalTextLength) * totalDuration;
 
-                                const sentenceStartSeconds = startSeconds + currentTimeOffset;
-                                const sentenceEndSeconds = k === sentences.length - 1
-                                    ? endSeconds  // Last sentence gets exact end time
-                                    : startSeconds + currentTimeOffset + proportionalDuration;
+                                // Ensure minimum duration to avoid invisible subtitles
+                                if (proportionalDuration < MIN_DURATION && k < sentences.length - 1) {
+                                    proportionalDuration = MIN_DURATION;
+                                }
+
+                                const sentenceStartSeconds = globalStartSeconds + currentTimeOffset;
+                                let sentenceEndSeconds;
+
+                                if (k === sentences.length - 1) {
+                                    // Last sentence gets exact end time
+                                    sentenceEndSeconds = globalEndSeconds;
+                                } else {
+                                    sentenceEndSeconds = sentenceStartSeconds + proportionalDuration;
+                                    // Ensure we don't exceed the global end time
+                                    if (sentenceEndSeconds > globalEndSeconds) {
+                                        sentenceEndSeconds = globalEndSeconds;
+                                    }
+                                }
+
+                                // Final safety check: ensure start < end
+                                if (sentenceEndSeconds <= sentenceStartSeconds) {
+                                    sentenceEndSeconds = sentenceStartSeconds + MIN_DURATION;
+                                }
 
                                 joined.push({
                                     number: joined.length + 1,
