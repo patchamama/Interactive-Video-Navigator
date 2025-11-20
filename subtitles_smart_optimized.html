@@ -662,7 +662,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.3 Auto-End + Join</span>
+            <span class="version-badge">v3.4 Simplified UI</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -681,20 +681,16 @@
                 </div>
                 <div class="checkbox-control">
                     <input type="checkbox" id="improveYouTubeSubs" onchange="reprocessSubtitles()">
-                    <label for="improveYouTubeSubs">YouTube</label>
+                    <label for="improveYouTubeSubs">YouTube Subs. Cleaner</label>
+                </div>
+                <div class="checkbox-control">
+                    <input type="checkbox" id="joinSentencesCheckbox">
+                    <label for="joinSentencesCheckbox">Join Sentences</label>
                 </div>
                 <div class="stop-button-wrapper">
-                    <button id="joinSentencesButton" class="export-button" onclick="joinSentences()" disabled style="background: #ff9800;">
-                        <span>🔗</span>
-                        <span>Join Sentences</span>
-                    </button>
                     <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
                         <span>💾</span>
                         <span>Export SRT</span>
-                    </button>
-                    <button id="toggleStatusColumn" class="export-button" onclick="toggleStatusColumn()" disabled style="background: #9c27b0;">
-                        <span>👁️</span>
-                        <span id="toggleStatusText">Hide Status</span>
                     </button>
                 </div>
             </div>
@@ -854,7 +850,6 @@
         let currentFileName = null;
 
         // Status column tracking system
-        let statusColumnVisible = true;
         let originalStatusText = '((Waiting, Espera, Warten))';
         let lastFoundIndex = 0;
         let comparisonInterval = null;
@@ -882,39 +877,6 @@
 
             const percentage = Math.round((lastFoundIndex / rows.length) * 100);
             document.title = `${percentage}% - SRT Parser`;
-        }
-
-        function toggleStatusColumn() {
-            statusColumnVisible = !statusColumnVisible;
-
-            const header = document.getElementById('statusColumnHeader');
-            const tableBody = document.getElementById('tableBody');
-            const rows = tableBody.getElementsByTagName('tr');
-            const toggleText = document.getElementById('toggleStatusText');
-
-            if (statusColumnVisible) {
-                // Show column
-                header.classList.remove('status-hidden');
-                for (let i = 0; i < rows.length; i++) {
-                    const statusCell = rows[i].cells[4];
-                    if (statusCell) {
-                        statusCell.classList.remove('status-hidden');
-                    }
-                }
-                toggleText.textContent = 'Hide Status';
-                console.log('✅ Status column is now VISIBLE');
-            } else {
-                // Hide column
-                header.classList.add('status-hidden');
-                for (let i = 0; i < rows.length; i++) {
-                    const statusCell = rows[i].cells[4];
-                    if (statusCell) {
-                        statusCell.classList.add('status-hidden');
-                    }
-                }
-                toggleText.textContent = 'Show Status';
-                console.log('🙈 Status column is now HIDDEN');
-            }
         }
 
         function showProcessingStatus(title, details = '') {
@@ -1051,7 +1013,6 @@
             console.log(`   Continuous execution mode (no delay)`);
             console.log(`   Starting from row #${lastFoundIndex + 1}`);
             console.log(`   Looking for status: "${originalStatusText}"`);
-            console.log(`   Status column visible: ${statusColumnVisible ? 'YES' : 'NO'}`);
 
             // Show status
             showProcessingStatus('🔄 Smart scroll active', `Monitoring row #${lastFoundIndex + 1} - Waiting for translation...`);
@@ -1432,8 +1393,6 @@
             document.getElementById('tableContainer').classList.remove('hidden');
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('exportButton').disabled = false;
-            document.getElementById('toggleStatusColumn').disabled = false;
-            document.getElementById('joinSentencesButton').disabled = false;
             
             setTimeout(() => {
                 const firstRow = tbody.getElementsByTagName('tr')[0];
@@ -1563,11 +1522,6 @@
                 cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
                 cellStatus.textContent = sub.status;
                 cellStatus.className = 'cell-status';
-
-                // Apply status column visibility
-                if (!statusColumnVisible) {
-                    cellStatus.classList.add('status-hidden');
-                }
             });
 
             // Update stats
