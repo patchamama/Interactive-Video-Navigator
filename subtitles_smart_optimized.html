@@ -2063,17 +2063,6 @@
                         }
                     }
 
-                    // Strategy 3A: Search BACKWARDS for last space
-                    if (splitPoint === -1) {
-                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
-                            if (remainingText[j] === ' ') {
-                                splitPoint = j + 1;
-                                strategy = 'last space (backward)';
-                                break;
-                            }
-                        }
-                    }
-
                     // ============================================
                     // SEARCH FORWARDS IF NOTHING FOUND BACKWARDS (from MAX_LENGTH to end)
                     // ============================================
