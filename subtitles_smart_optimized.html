@@ -662,7 +662,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.5 Smart Abbreviations</span>
+            <span class="version-badge">v3.6 Subordinate Split</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -686,6 +686,10 @@
                 <div class="checkbox-control">
                     <input type="checkbox" id="joinSentencesCheckbox">
                     <label for="joinSentencesCheckbox">Join Sentences</label>
+                </div>
+                <div class="delay-control">
+                    <label for="maxJoinLines">Max lines:</label>
+                    <input type="number" id="maxJoinLines" value="3" min="2" max="10" step="1">
                 </div>
                 <div class="stop-button-wrapper">
                     <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
@@ -1429,6 +1433,10 @@
 
             console.log(`\n🔗 Starting Join Sentences - ${subtitles.length} subtitles`);
 
+            // Get max lines to join before splitting on subordinate clauses
+            const maxJoinLines = parseInt(document.getElementById('maxJoinLines').value) || 3;
+            console.log(`   Max lines before subordinate split: ${maxJoinLines}`);
+
             // Common abbreviations that end with period but are NOT sentence endings
             const abbreviations = [
                 'z\\.\\s*B',     // z. B. (German: zum Beispiel)
@@ -1448,6 +1456,35 @@
                 'no',            // no. (number)
                 'núm'            // núm.
             ];
+
+            // Subordinate clause markers (conjunctions that introduce dependent clauses)
+            const subordinateMarkers = {
+                de: ['dass', 'weil', 'ob', 'wenn', 'als', 'damit', 'obwohl', 'bevor', 'nachdem',
+                     'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'deshalb',
+                     'trotzdem', 'danach', 'zuerst', 'außerdem'],
+                es: ['que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
+                     'para que', 'ya que', 'puesto que', 'dado que', 'a pesar de', 'sin embargo',
+                     'por lo tanto', 'entonces', 'además', 'también', 'pero', 'sino', 'o', 'y'],
+                en: ['that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
+                     'since', 'unless', 'until', 'whereas', 'so that', 'in order to', 'however',
+                     'therefore', 'thus', 'moreover', 'furthermore', 'but', 'or', 'and', 'yet']
+            };
+
+            // Flatten all subordinate markers into one array (case-insensitive)
+            const allSubordinateMarkers = [
+                ...subordinateMarkers.de,
+                ...subordinateMarkers.es,
+                ...subordinateMarkers.en
+            ];
+
+            // Function to check if text starts with a subordinate marker
+            function startsWithSubordinateMarker(text) {
+                const lowerText = text.trim().toLowerCase();
+                return allSubordinateMarkers.some(marker => {
+                    const pattern = new RegExp(`^${marker}\\b`, 'i');
+                    return pattern.test(lowerText);
+                });
+            }
 
             // Create regex to detect real sentence endings (not abbreviations)
             const abbrevPattern = `(?<!\\b(?:${abbreviations.join('|')}))\\.`;
@@ -1479,18 +1516,31 @@
                 if (!endsWithTerminator && i < subtitles.length - 1) {
                     // Join with following lines until we find a terminator
                     let j = i + 1;
+                    let linesJoined = 1; // Count of lines joined (starting with 1 for current line)
+
                     while (j < subtitles.length) {
-                        currentText += ' ' + subtitles[j].text;
+                        const nextLineText = subtitles[j].text;
+
+                        // Check if we've joined enough lines and next line starts with subordinate marker
+                        if (linesJoined >= maxJoinLines && startsWithSubordinateMarker(nextLineText)) {
+                            console.log(`  ⚠ Stopping at row ${j + 1}: reached ${linesJoined} lines and found subordinate marker`);
+                            endTime = subtitles[j - 1].endTime; // Use previous line's end time
+                            j--; // Don't include this line
+                            break;
+                        }
+
+                        currentText += ' ' + nextLineText;
                         endTime = subtitles[j].endTime;
+                        linesJoined++;
 
                         // Check if this line ends with terminator
-                        if (endsWithRealTerminator(subtitles[j].text)) {
+                        if (endsWithRealTerminator(nextLineText)) {
                             break;
                         }
                         j++;
                     }
 
-                    console.log(`✓ Joined rows ${i + 1} to ${j + 1}`);
+                    console.log(`✓ Joined rows ${i + 1} to ${j + 1} (${linesJoined} lines)`);
 
                     // Split by real sentence terminators (respecting abbreviations)
                     // This is a simple approach - just keep as one sentence if it contains abbreviations
