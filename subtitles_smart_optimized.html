@@ -694,7 +694,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.8 Toggle Buttons</span>
+            <span class="version-badge">v3.9 Split Longlines</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -722,6 +722,10 @@
                 <button id="fixLossTimesButton" class="toggle-button" onclick="toggleFixLossTimes()">
                     <span>⏱️</span>
                     <span>Fix Loss Times</span>
+                </button>
+                <button id="splitLonglinesButton" class="toggle-button" onclick="toggleSplitLonglines()">
+                    <span>✂️</span>
+                    <span>Split Longlines</span>
                 </button>
                 <div class="delay-control">
                     <label for="maxJoinLines">Max lines:</label>
@@ -1485,6 +1489,27 @@
         }
 
         /**
+         * Toggle Split Longlines button
+         */
+        function toggleSplitLonglines() {
+            const button = document.getElementById('splitLonglinesButton');
+            button.classList.toggle('active');
+
+            if (button.classList.contains('active')) {
+                splitLonglines();
+            } else {
+                reprocessSubtitles();
+            }
+        }
+
+        /**
+         * Check if Split Longlines is active
+         */
+        function isSplitLonglinesActive() {
+            return document.getElementById('splitLonglinesButton').classList.contains('active');
+        }
+
+        /**
          * Apply join sentences to current table content
          */
         function handleJoinSentences() {
@@ -1935,6 +1960,197 @@
             // This allows reprocessSubtitles() to revert to the original when checkbox is unchecked
 
             updateProcessingStatus('✅ Join complete!', `Reduced from ${subtitles.length} to ${finalJoined.length} subtitles`);
+            setTimeout(() => hideProcessingStatus(), 2000);
+        }
+
+        /**
+         * Split long subtitle lines (>150 characters) into smaller chunks
+         * Uses proportional time distribution and intelligent split points
+         */
+        function splitLonglines() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles to process');
+                return;
+            }
+
+            showProcessingStatus('✂️ Splitting long lines...', 'Processing subtitles');
+
+            // Extract current subtitles from table
+            const subtitles = [];
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                subtitles.push({
+                    number: cells[0].textContent,
+                    startTime: cells[1].textContent,
+                    endTime: cells[2].textContent,
+                    text: cells[3].innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim(),
+                    status: cells[4] ? cells[4].textContent : originalStatusText
+                });
+            }
+
+            console.log(`\n✂️ Starting Split Longlines - ${subtitles.length} subtitles`);
+
+            const MAX_LENGTH = 150;
+            const MIN_DURATION = 0.1; // Minimum 100ms duration
+
+            // Subordinate conjunctions for intelligent splitting
+            const subordinateWords = [
+                // German
+                'weil', 'wenn', 'dass', 'ob', 'als', 'damit', 'obwohl', 'bevor', 'nachdem',
+                'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern',
+                // Spanish
+                'que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
+                'para que', 'ya que', 'pero', 'sino', 'o', 'y',
+                // English
+                'that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
+                'since', 'unless', 'until', 'but', 'or', 'and', 'yet'
+            ];
+
+            const split = [];
+
+            for (let i = 0; i < subtitles.length; i++) {
+                const sub = subtitles[i];
+                const text = sub.text.replace(/\n/g, ' ').trim(); // Remove line breaks for processing
+
+                if (text.length <= MAX_LENGTH) {
+                    // Line is short enough, keep as is
+                    split.push(sub);
+                    continue;
+                }
+
+                console.log(`  ⚠ Long line (${text.length} chars): "${text.substring(0, 50)}..."`);
+
+                // Find best split point
+                const chunks = [];
+                let remainingText = text;
+                let position = 0;
+
+                while (remainingText.length > MAX_LENGTH) {
+                    let splitPoint = -1;
+
+                    // Strategy 1: Try to find sentence terminator (.?!) before MAX_LENGTH
+                    for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
+                        if (/[.!?]/.test(remainingText[j])) {
+                            splitPoint = j + 1; // Include the punctuation
+                            break;
+                        }
+                    }
+
+                    // Strategy 2: If no sentence terminator, try subordinate conjunction
+                    if (splitPoint === -1) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
+                            if (remainingText[j] === ' ') {
+                                const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
+                                if (subordinateWords.includes(wordAfter)) {
+                                    splitPoint = j + 1; // Split before the subordinate word
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 3: If still no good split point, split at last space before MAX_LENGTH
+                    if (splitPoint === -1) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
+                            if (remainingText[j] === ' ') {
+                                splitPoint = j + 1;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Strategy 4: Force split at MAX_LENGTH if no space found
+                    if (splitPoint === -1) {
+                        splitPoint = MAX_LENGTH;
+                    }
+
+                    chunks.push(remainingText.substring(0, splitPoint).trim());
+                    remainingText = remainingText.substring(splitPoint).trim();
+                }
+
+                // Add remaining text
+                if (remainingText.length > 0) {
+                    chunks.push(remainingText);
+                }
+
+                console.log(`    → Split into ${chunks.length} chunks`);
+
+                // Calculate proportional time distribution
+                const totalTextLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                const startSeconds = timeToSeconds(sub.startTime);
+                const endSeconds = timeToSeconds(sub.endTime);
+                const totalDuration = endSeconds - startSeconds;
+
+                let currentTimeOffset = 0;
+                for (let k = 0; k < chunks.length; k++) {
+                    const chunk = chunks[k];
+                    const chunkLength = chunk.length;
+                    let proportionalDuration = (chunkLength / totalTextLength) * totalDuration;
+
+                    // Ensure minimum duration
+                    if (proportionalDuration < MIN_DURATION && k < chunks.length - 1) {
+                        proportionalDuration = MIN_DURATION;
+                    }
+
+                    const chunkStartSeconds = startSeconds + currentTimeOffset;
+                    let chunkEndSeconds;
+
+                    if (k === chunks.length - 1) {
+                        chunkEndSeconds = endSeconds; // Last chunk gets exact end time
+                    } else {
+                        chunkEndSeconds = chunkStartSeconds + proportionalDuration;
+                        if (chunkEndSeconds > endSeconds) {
+                            chunkEndSeconds = endSeconds;
+                        }
+                    }
+
+                    // Safety check
+                    if (chunkEndSeconds <= chunkStartSeconds) {
+                        chunkEndSeconds = chunkStartSeconds + MIN_DURATION;
+                    }
+
+                    split.push({
+                        number: split.length + 1,
+                        startTime: secondsToTime(chunkStartSeconds),
+                        endTime: secondsToTime(chunkEndSeconds),
+                        text: chunk,
+                        status: sub.status
+                    });
+
+                    currentTimeOffset += proportionalDuration;
+                    console.log(`      Chunk ${k + 1}: ${secondsToTime(chunkStartSeconds)} → ${secondsToTime(chunkEndSeconds)} (${chunk.substring(0, 30)}...)`);
+                }
+            }
+
+            console.log(`✅ Split complete - ${subtitles.length} → ${split.length} subtitles`);
+
+            // Clear table and display split subtitles
+            tableBody.innerHTML = '';
+
+            split.forEach(sub => {
+                const row = tableBody.insertRow();
+
+                const cellNumber = row.insertCell(0);
+                const cellStart = row.insertCell(1);
+                const cellEnd = row.insertCell(2);
+                const cellText = row.insertCell(3);
+                const cellStatus = row.insertCell(4);
+
+                cellNumber.textContent = sub.number;
+                cellStart.textContent = sub.startTime;
+                cellEnd.textContent = sub.endTime;
+                cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
+                cellStatus.textContent = sub.status;
+                cellStatus.className = 'cell-status';
+            });
+
+            // Update stats
+            document.getElementById('totalSubs').textContent = split.length.toLocaleString();
+
+            updateProcessingStatus('✅ Split complete!', `Expanded from ${subtitles.length} to ${split.length} subtitles`);
             setTimeout(() => hideProcessingStatus(), 2000);
         }
 
