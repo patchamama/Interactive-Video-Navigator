@@ -684,7 +684,7 @@
                     <label for="improveYouTubeSubs">YouTube Subs. Cleaner</label>
                 </div>
                 <div class="checkbox-control">
-                    <input type="checkbox" id="joinSentencesCheckbox">
+                    <input type="checkbox" id="joinSentencesCheckbox" onchange="handleJoinSentencesToggle()">
                     <label for="joinSentencesCheckbox">Join Sentences</label>
                 </div>
                 <div class="delay-control">
@@ -1237,16 +1237,32 @@
                     
                     currentSubtitles = subtitles;
                     currentFileName = file.name;
-                    
+
                     const improveYT = document.getElementById('improveYouTubeSubs').checked;
+                    const joinSentences = document.getElementById('joinSentencesCheckbox').checked;
+
                     if (improveYT) {
                         const improved = improveYouTubeSubtitles(subtitles);
                         displaySubtitles(improved, file.name);
+
+                        // Apply join sentences if checkbox is checked
+                        if (joinSentences) {
+                            setTimeout(() => {
+                                handleJoinSentences();
+                            }, 200);
+                        }
                     } else {
                         displaySubtitles(subtitles, file.name);
                         hideProcessingStatus();
+
+                        // Apply join sentences if checkbox is checked
+                        if (joinSentences) {
+                            setTimeout(() => {
+                                handleJoinSentences();
+                            }, 200);
+                        }
                     }
-                    
+
                     document.getElementById('loading').classList.add('hidden');
                 } catch (error) {
                     document.getElementById('loading').classList.add('hidden');
@@ -1345,25 +1361,57 @@
 
         function reprocessSubtitles() {
             if (!currentSubtitles || !currentFileName) return;
-            
+
             showProcessingStatus('🔄 Reprocessing subtitles...', 'Please wait...');
-            
+
             setTimeout(() => {
+                // Always start from originalText
                 let processedSubs = currentSubtitles.map(sub => ({
                     ...sub,
                     text: sub.originalText
                 }));
-                
+
                 const improveYT = document.getElementById('improveYouTubeSubs').checked;
                 if (improveYT) {
                     processedSubs = improveYouTubeSubtitles(processedSubs);
                 } else {
                     hideProcessingStatus();
                 }
-                
-                currentSubtitles = processedSubs;
+
+                // NOTE: We DO NOT update currentSubtitles here to preserve the original state
+                // This allows reverting to original when checkboxes are unchecked
                 displaySubtitles(processedSubs, currentFileName);
+
+                // Apply join sentences if checkbox is checked
+                const joinSentences = document.getElementById('joinSentencesCheckbox').checked;
+                if (joinSentences) {
+                    setTimeout(() => {
+                        handleJoinSentences();
+                    }, 200);
+                }
             }, 100);
+        }
+
+        /**
+         * Handle Join Sentences checkbox toggle
+         */
+        function handleJoinSentencesToggle() {
+            const isChecked = document.getElementById('joinSentencesCheckbox').checked;
+
+            if (isChecked) {
+                // Apply join sentences
+                handleJoinSentences();
+            } else {
+                // Reprocess without join sentences
+                reprocessSubtitles();
+            }
+        }
+
+        /**
+         * Apply join sentences to current table content
+         */
+        function handleJoinSentences() {
+            joinSentences();
         }
 
         function displaySubtitles(subtitles, fileName) {
@@ -1648,6 +1696,9 @@
 
             // Update stats
             document.getElementById('totalSubs').textContent = joined.length.toLocaleString();
+
+            // NOTE: We DO NOT update currentSubtitles here to preserve the original state
+            // This allows reprocessSubtitles() to revert to the original when checkbox is unchecked
 
             updateProcessingStatus('✅ Join complete!', `Reduced from ${subtitles.length} to ${joined.length} subtitles`);
             setTimeout(() => hideProcessingStatus(), 2000);
