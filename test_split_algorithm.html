@@ -230,7 +230,11 @@
                     console.log(`  No split point found backward, searching FORWARD...`);
 
                     // Strategy 1B: Sentence terminator forward
-                    for (let j = maxLength; j < remainingText.length; j++) {
+                    // Limit search to 2x maxLength to avoid finding terminators too far away
+                    const maxSearchDistance = Math.min(remainingText.length, maxLength * 2);
+                    console.log(`  Forward search range: ${maxLength} → ${maxSearchDistance}`);
+
+                    for (let j = maxLength; j < maxSearchDistance; j++) {
                         if (/[.!?]/.test(remainingText[j])) {
                             splitPoint = j + 1;
                             strategy = 'sentence terminator (forward)';
@@ -238,9 +242,9 @@
                         }
                     }
 
-                    // Strategy 1.5B: Comma + pronoun forward
+                    // Strategy 1.5B: Comma + pronoun forward (limited range)
                     if (splitPoint === -1) {
-                        for (let j = maxLength; j < remainingText.length; j++) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
                             if (remainingText[j] === ',') {
                                 const afterComma = remainingText.substring(j + 1).trimStart();
                                 const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
@@ -253,9 +257,9 @@
                         }
                     }
 
-                    // Strategy 2B: Subordinate word forward
+                    // Strategy 2B: Subordinate word forward (limited range)
                     if (splitPoint === -1) {
-                        for (let j = maxLength; j < remainingText.length; j++) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
                             if (remainingText[j] === ' ') {
                                 const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
                                 if (subordinateWords.includes(wordAfter)) {

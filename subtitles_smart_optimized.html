@@ -901,7 +901,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.10.4 Edit-Mode</span>
+            <span class="version-badge">v3.10.5 Edit-Mode</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -2321,8 +2321,10 @@
                     // ============================================
 
                     // Strategy 1B: Search FORWARDS for sentence terminator (.?!)
+                    // Limit search to 2x MAX_LENGTH to avoid finding terminators too far away
                     if (splitPoint === -1) {
-                        for (let j = MAX_LENGTH; j < remainingText.length; j++) {
+                        const maxSearchDistance = Math.min(remainingText.length, MAX_LENGTH * 2);
+                        for (let j = MAX_LENGTH; j < maxSearchDistance; j++) {
                             if (/[.!?]/.test(remainingText[j])) {
                                 splitPoint = j + 1; // Include the punctuation
                                 strategy = 'sentence terminator (forward)';
@@ -2332,8 +2334,10 @@
                     }
 
                     // Strategy 1.5B: Search FORWARDS for comma + personal pronoun
+                    // Limit search to 2x MAX_LENGTH for efficiency
                     if (splitPoint === -1) {
-                        for (let j = MAX_LENGTH; j < remainingText.length; j++) {
+                        const maxSearchDistance = Math.min(remainingText.length, MAX_LENGTH * 2);
+                        for (let j = MAX_LENGTH; j < maxSearchDistance; j++) {
                             if (remainingText[j] === ',') {
                                 // Check if after comma there's a space and then a personal pronoun
                                 const afterComma = remainingText.substring(j + 1).trimStart();
@@ -2348,8 +2352,10 @@
                     }
 
                     // Strategy 2B: Search FORWARDS for subordinate conjunction
+                    // Limit search to 2x MAX_LENGTH for efficiency
                     if (splitPoint === -1) {
-                        for (let j = MAX_LENGTH; j < remainingText.length; j++) {
+                        const maxSearchDistance = Math.min(remainingText.length, MAX_LENGTH * 2);
+                        for (let j = MAX_LENGTH; j < maxSearchDistance; j++) {
                             if (remainingText[j] === ' ') {
                                 const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
                                 if (subordinateWords.includes(wordAfter)) {
@@ -3463,7 +3469,11 @@
                     console.log(`  No split point found backward, searching FORWARD...`);
 
                     // Strategy 1B: Sentence terminator forward
-                    for (let j = maxLength; j < remainingText.length; j++) {
+                    // Limit search to 2x maxLength to avoid finding terminators too far away
+                    const maxSearchDistance = Math.min(remainingText.length, maxLength * 2);
+                    console.log(`  Forward search range: ${maxLength} → ${maxSearchDistance}`);
+
+                    for (let j = maxLength; j < maxSearchDistance; j++) {
                         if (/[.!?]/.test(remainingText[j])) {
                             splitPoint = j + 1;
                             strategy = 'sentence terminator (forward)';
@@ -3471,9 +3481,9 @@
                         }
                     }
 
-                    // Strategy 1.5B: Comma + pronoun forward
+                    // Strategy 1.5B: Comma + pronoun forward (limited range)
                     if (splitPoint === -1) {
-                        for (let j = maxLength; j < remainingText.length; j++) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
                             if (remainingText[j] === ',') {
                                 const afterComma = remainingText.substring(j + 1).trimStart();
                                 const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
@@ -3486,9 +3496,9 @@
                         }
                     }
 
-                    // Strategy 2B: Subordinate word forward
+                    // Strategy 2B: Subordinate word forward (limited range)
                     if (splitPoint === -1) {
-                        for (let j = maxLength; j < remainingText.length; j++) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
                             if (remainingText[j] === ' ') {
                                 const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
                                 if (subordinateWords.includes(wordAfter)) {
