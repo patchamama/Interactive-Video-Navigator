@@ -597,6 +597,12 @@
             border: 2px solid #ff5555;
         }
 
+        .subtitle-table tbody tr.longline-highlight {
+            background-color: #e1bee7;
+            animation: longline-highlight-fade 2s ease-out;
+            border: 2px solid #9c27b0;
+        }
+
         @keyframes highlight-fade {
             0% { background-color: #ffc107; }
             100% { background-color: #fff3cd; }
@@ -605,6 +611,25 @@
         @keyframes losstime-highlight-fade {
             0% { background-color: #ff0000; }
             100% { background-color: #ffcccc; }
+        }
+
+        @keyframes longline-highlight-fade {
+            0% { background-color: #9c27b0; }
+            100% { background-color: #e1bee7; }
+        }
+
+        /* Highlight for text exceeding max length */
+        .excess-text {
+            background-color: #ffd54f;
+            padding: 2px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .excess-text:hover {
+            background-color: #ffc107;
+            box-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
         }
 
         .cell-number {
@@ -775,6 +800,10 @@
                         <span>🔍</span>
                         <span>Search Losstime...</span>
                     </button>
+                    <button id="searchLonglinesButton" class="export-button" onclick="searchNextLongline()" disabled style="background: #9c27b0; margin-right: 10px;">
+                        <span>📏</span>
+                        <span>Search Longlines</span>
+                    </button>
                     <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
                         <span>💾</span>
                         <span>Export SRT</span>
@@ -936,6 +965,7 @@
         let currentSubtitles = null;
         let currentFileName = null;
         let lastLosstimeSearchIndex = -1; // Track last search position for losstime
+        let lastLonglineSearchIndex = -1; // Track last search position for longlines
 
         // Status column tracking system
         let originalStatusText = '((Waiting, Espera, Warten))';
@@ -1591,6 +1621,7 @@
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('exportButton').disabled = false;
             document.getElementById('searchLosstimeButton').disabled = false;
+            document.getElementById('searchLonglinesButton').disabled = false;
 
             setTimeout(() => {
                 const firstRow = tbody.getElementsByTagName('tr')[0];
@@ -2455,6 +2486,260 @@
 
                 alert('No invisible subtitles (losstime) found!\n\nAll subtitles have valid time ranges.');
             }
+        }
+
+        // ============================================
+        // SEARCH LONGLINES (LINES EXCEEDING MAX LENGTH)
+        // ============================================
+
+        /**
+         * Search for next subtitle with text exceeding max length
+         * Highlights the excess text and makes it clickable for manual splitting
+         */
+        function searchNextLongline() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles loaded');
+                return;
+            }
+
+            const MAX_LENGTH = parseInt(document.getElementById('maxSubtitleLength').value) || 200;
+
+            // Start searching from position after last found
+            const startIndex = lastLonglineSearchIndex + 1;
+            let foundIndex = -1;
+
+            console.log(`\n📏 Searching for longlines (>${MAX_LENGTH} chars) from row ${startIndex + 1}...`);
+
+            // Search from current position to end
+            for (let i = startIndex; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const text = cells[3].innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+                if (text.length > MAX_LENGTH) {
+                    foundIndex = i;
+                    console.log(`  ⚠ Found longline at row ${i + 1}: ${text.length} chars`);
+                    break;
+                }
+            }
+
+            // If not found from current position, wrap around and search from beginning
+            if (foundIndex === -1 && startIndex > 0) {
+                console.log('  No longline found after current position, wrapping to beginning...');
+                for (let i = 0; i < startIndex; i++) {
+                    const cells = rows[i].cells;
+                    const text = cells[3].innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+                    if (text.length > MAX_LENGTH) {
+                        foundIndex = i;
+                        console.log(`  ⚠ Found longline at row ${i + 1}: ${text.length} chars`);
+                        break;
+                    }
+                }
+            }
+
+            if (foundIndex !== -1) {
+                // Found a longline subtitle
+                lastLonglineSearchIndex = foundIndex;
+
+                // Remove previous highlights
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].classList.remove('longline-highlight');
+                }
+
+                // Highlight found row
+                rows[foundIndex].classList.add('longline-highlight');
+
+                // Highlight the excess text and make it clickable
+                highlightExcessText(rows[foundIndex], MAX_LENGTH);
+
+                // Scroll to the row
+                rows[foundIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Show notification
+                const rowNumber = foundIndex + 1;
+                const textLength = rows[foundIndex].cells[3].textContent.length;
+                const excess = textLength - MAX_LENGTH;
+
+                console.log(`✅ Navigated to row ${rowNumber}`);
+                updateProcessingStatus(
+                    `📏 Longline found at row ${rowNumber}`,
+                    `Length: ${textLength} chars (${excess} over limit)`
+                );
+
+                setTimeout(() => hideProcessingStatus(), 3000);
+            } else {
+                // No longline found
+                console.log('✅ No longlines found in document');
+                lastLonglineSearchIndex = -1; // Reset for next search
+
+                alert(`No long lines found!\n\nAll subtitles are within ${MAX_LENGTH} characters.`);
+            }
+        }
+
+        /**
+         * Highlight the text that exceeds the max length and make it clickable
+         */
+        function highlightExcessText(row, maxLength) {
+            const textCell = row.cells[3];
+            const fullText = textCell.innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+            if (fullText.length <= maxLength) {
+                return;
+            }
+
+            // Split text into normal part and excess part
+            const normalPart = fullText.substring(0, maxLength);
+            const excessPart = fullText.substring(maxLength);
+
+            // Create the highlighted HTML
+            const highlightedHTML = `${normalPart}<span class="excess-text" data-row-index="${row.rowIndex - 1}">${excessPart}</span>`;
+
+            textCell.innerHTML = highlightedHTML;
+
+            // Add click event to excess text
+            const excessSpan = textCell.querySelector('.excess-text');
+            if (excessSpan) {
+                excessSpan.addEventListener('click', function(event) {
+                    handleExcessTextClick(event, row, fullText, maxLength);
+                });
+            }
+        }
+
+        /**
+         * Handle click on excess text - prompt user to split at clicked position
+         */
+        function handleExcessTextClick(event, row, fullText, maxLength) {
+            // Get the click position within the text
+            const span = event.target;
+            const spanText = span.textContent;
+
+            // Calculate approximate character position based on click coordinates
+            const spanRect = span.getBoundingClientRect();
+            const clickX = event.clientX - spanRect.left;
+            const spanWidth = spanRect.width;
+            const clickRatio = clickX / spanWidth;
+            const clickPositionInSpan = Math.round(spanText.length * clickRatio);
+
+            // Calculate absolute position in full text
+            const splitPosition = maxLength + clickPositionInSpan;
+
+            // Show confirmation dialog
+            const beforeText = fullText.substring(0, splitPosition).trim();
+            const afterText = fullText.substring(splitPosition).trim();
+
+            const message = `Do you want to split this subtitle at this position?\n\n` +
+                          `BEFORE (${beforeText.length} chars):\n"${beforeText.substring(0, 50)}..."\n\n` +
+                          `AFTER (${afterText.length} chars):\n"${afterText.substring(0, 50)}..."\n\n` +
+                          `Click OK to split, Cancel to choose another position.`;
+
+            if (confirm(message)) {
+                splitSubtitleAtPosition(row, fullText, splitPosition);
+            }
+        }
+
+        /**
+         * Split a subtitle into two entries at specified character position
+         * Recalculates times proportionally based on text length
+         */
+        function splitSubtitleAtPosition(row, fullText, splitPosition) {
+            const tableBody = document.getElementById('tableBody');
+            const rowIndex = row.rowIndex - 1;
+
+            // Get original subtitle data
+            const cells = row.cells;
+            const number = cells[0].textContent;
+            const startTime = cells[1].textContent;
+            const endTime = cells[2].textContent;
+            const status = cells[4] ? cells[4].textContent : originalStatusText;
+
+            // Split text at position
+            const text1 = fullText.substring(0, splitPosition).trim();
+            const text2 = fullText.substring(splitPosition).trim();
+
+            if (!text1 || !text2) {
+                alert('Split would create empty subtitle. Please choose a different position.');
+                return;
+            }
+
+            console.log(`\n✂️ Manual split at position ${splitPosition}:`);
+            console.log(`  Part 1 (${text1.length} chars): "${text1.substring(0, 50)}..."`);
+            console.log(`  Part 2 (${text2.length} chars): "${text2.substring(0, 50)}..."`);
+
+            // Calculate proportional times
+            const MIN_DURATION = 0.1; // 100ms minimum
+            const startSeconds = timeToSeconds(startTime);
+            const endSeconds = timeToSeconds(endTime);
+            const totalDuration = endSeconds - startSeconds;
+
+            // Proportional time distribution based on text length
+            const totalLength = text1.length + text2.length;
+            const proportion1 = text1.length / totalLength;
+
+            let duration1 = totalDuration * proportion1;
+            let duration2 = totalDuration * (1 - proportion1);
+
+            // Ensure minimum duration
+            if (duration1 < MIN_DURATION) {
+                duration1 = MIN_DURATION;
+                duration2 = totalDuration - MIN_DURATION;
+            }
+            if (duration2 < MIN_DURATION) {
+                duration2 = MIN_DURATION;
+                duration1 = totalDuration - MIN_DURATION;
+            }
+
+            const midSeconds = startSeconds + duration1;
+            const midTime = secondsToTime(midSeconds);
+
+            console.log(`  Time split: ${startTime} → ${midTime} → ${endTime}`);
+
+            // Update current row with first part
+            cells[1].textContent = startTime;
+            cells[2].textContent = midTime;
+            cells[3].innerHTML = text1.replace(/\n/g, '<br>');
+            cells[4].textContent = status;
+
+            // Remove highlights
+            row.classList.remove('longline-highlight');
+
+            // Insert new row for second part
+            const newRow = tableBody.insertRow(rowIndex + 1);
+            const newNumber = newRow.insertCell(0);
+            const newStart = newRow.insertCell(1);
+            const newEnd = newRow.insertCell(2);
+            const newText = newRow.insertCell(3);
+            const newStatus = newRow.insertCell(4);
+
+            newNumber.textContent = number; // Will be renumbered below
+            newStart.textContent = midTime;
+            newEnd.textContent = endTime;
+            newText.innerHTML = text2.replace(/\n/g, '<br>');
+            newStatus.textContent = status;
+            newStatus.className = 'cell-status';
+
+            // Renumber all subtitles
+            const allRows = tableBody.getElementsByTagName('tr');
+            for (let i = 0; i < allRows.length; i++) {
+                allRows[i].cells[0].textContent = i + 1;
+            }
+
+            // Update stats
+            document.getElementById('totalSubs').textContent = allRows.length.toLocaleString();
+
+            console.log('✅ Manual split completed');
+            showProcessingStatus('✅ Split complete!', `Subtitle divided into 2 entries`);
+            setTimeout(() => hideProcessingStatus(), 2000);
+
+            // Highlight the newly created rows
+            row.classList.add('highlight');
+            newRow.classList.add('highlight');
+            setTimeout(() => {
+                row.classList.remove('highlight');
+                newRow.classList.remove('highlight');
+            }, 2000);
         }
 
         // ============================================
