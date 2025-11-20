@@ -705,7 +705,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.9.2 Search Losstime</span>
+            <span class="version-badge">v3.9.3 Comma+Pronoun</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -2031,6 +2031,16 @@
                 'since', 'unless', 'until', 'but', 'or', 'and', 'yet'
             ];
 
+            // Personal pronouns (for comma + pronoun detection)
+            const personalPronouns = [
+                // German
+                'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'Sie',
+                // Spanish
+                'yo', 'tú', 'él', 'ella', 'usted', 'nosotros', 'nosotras', 'vosotros', 'vosotras', 'ellos', 'ellas', 'ustedes',
+                // English
+                'i', 'you', 'he', 'she', 'it', 'we', 'they'
+            ];
+
             const split = [];
 
             for (let i = 0; i < subtitles.length; i++) {
@@ -2066,6 +2076,22 @@
                         }
                     }
 
+                    // Strategy 1.5A: Search BACKWARDS for comma + personal pronoun
+                    if (splitPoint === -1) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
+                            if (remainingText[j] === ',') {
+                                // Check if after comma there's a space and then a personal pronoun
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (personalPronouns.includes(wordAfterComma)) {
+                                    splitPoint = j + 1; // Split after the comma
+                                    strategy = `comma + pronoun "${wordAfterComma}" (backward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     // Strategy 2A: Search BACKWARDS for subordinate conjunction
                     if (splitPoint === -1) {
                         for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.5; j--) {
@@ -2091,6 +2117,22 @@
                                 splitPoint = j + 1; // Include the punctuation
                                 strategy = 'sentence terminator (forward)';
                                 break;
+                            }
+                        }
+                    }
+
+                    // Strategy 1.5B: Search FORWARDS for comma + personal pronoun
+                    if (splitPoint === -1) {
+                        for (let j = MAX_LENGTH; j < remainingText.length; j++) {
+                            if (remainingText[j] === ',') {
+                                // Check if after comma there's a space and then a personal pronoun
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (personalPronouns.includes(wordAfterComma)) {
+                                    splitPoint = j + 1; // Split after the comma
+                                    strategy = `comma + pronoun "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
                             }
                         }
                     }
