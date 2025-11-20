@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Split Algorithm Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+        h1 {
+            color: #4ec9b0;
+        }
+        .test-case {
+            background-color: #252526;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #007acc;
+            border-radius: 4px;
+        }
+        .test-text {
+            background-color: #1e1e1e;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+        .result {
+            background-color: #263238;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .chunk {
+            background-color: #2d2d30;
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #4ec9b0;
+            border-radius: 2px;
+        }
+        .chunk-header {
+            color: #4fc1ff;
+            font-weight: bold;
+        }
+        button {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        #console {
+            background-color: #1e1e1e;
+            border: 1px solid #3c3c3c;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #f48771;
+        }
+        .success {
+            color: #4ec9b0;
+        }
+        .warning {
+            color: #dcdcaa;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Split Algorithm Test Suite</h1>
+
+    <div class="test-case">
+        <h2>Test Case 1: User's Problematic Line (450+ chars)</h2>
+        <p><strong>MAX_LENGTH:</strong> 100 characters</p>
+        <div class="test-text" id="testText1"></div>
+        <button onclick="runTest1()">Run Test 1</button>
+        <div id="result1" class="result"></div>
+    </div>
+
+    <div class="test-case">
+        <h2>Test Case 2: Same text with MAX_LENGTH = 200</h2>
+        <p><strong>MAX_LENGTH:</strong> 200 characters (default)</p>
+        <button onclick="runTest2()">Run Test 2</button>
+        <div id="result2" class="result"></div>
+    </div>
+
+    <div class="test-case">
+        <h2>Test Case 3: Simple German sentence</h2>
+        <p><strong>MAX_LENGTH:</strong> 50 characters</p>
+        <div class="test-text" id="testText3"></div>
+        <button onclick="runTest3()">Run Test 3</button>
+        <div id="result3" class="result"></div>
+    </div>
+
+    <button onclick="runAllTests()" style="background-color: #4ec9b0;">▶️ Run All Tests</button>
+    <button onclick="clearConsole()" style="background-color: #d16969;">🗑️ Clear Console</button>
+
+    <h2>Console Output</h2>
+    <div id="console"></div>
+
+    <script>
+        // Test texts
+        const problemText = "Das heißt jetzt hier z.B. bei dieser bei einer Feldgruppe Company Firma ähm äh hinterlege ich möglicherweise irgendeine Datenbanktabelle, vielleicht sogar ein eine Datenbankbabelle View aus irgendeinem Navision System, wo die ganzen meine ganzen Kunden oder sonstige Dinge ähm gepflegt sind und an dieser Stelle hat dann der Anwender kriegt dann halt an der Stelle die Dinge zur Auswahl, die in diesem führenden in dem Drittsystem halt ähm ähm als Stichwortig hinterlegt sind.";
+
+        const simpleText = "Das ist ein Test und wir wollen sehen wie der Algorithmus funktioniert wenn es zu lang ist.";
+
+        document.getElementById('testText1').textContent = problemText;
+        document.getElementById('testText3').textContent = simpleText;
+
+        // Console output
+        const consoleDiv = document.getElementById('console');
+        const originalConsoleLog = console.log;
+
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            const line = document.createElement('div');
+
+            if (message.includes('✅') || message.includes('RESULT')) {
+                line.className = 'success';
+            } else if (message.includes('⚠️') || message.includes('No split')) {
+                line.className = 'warning';
+            } else if (message.includes('❌') || message.includes('ERROR')) {
+                line.className = 'error';
+            }
+
+            line.textContent = message;
+            consoleDiv.appendChild(line);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        };
+
+        function clearConsole() {
+            consoleDiv.innerHTML = '';
+        }
+
+        // Split algorithm (copied from main application)
+        function testSplitAlgorithm(text, maxLength = 200) {
+            console.log('\n' + '='.repeat(80));
+            console.log('🧪 TESTING SPLIT ALGORITHM');
+            console.log('='.repeat(80));
+            console.log(`Text length: ${text.length} characters`);
+            console.log(`MAX_LENGTH: ${maxLength}`);
+            console.log(`Text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
+            console.log('-'.repeat(80));
+
+            const subordinateWords = [
+                // German (removed: was, die, das, als, den - these will be checked with comma prefix)
+                'weil', 'wenn', 'dass', 'ob', 'damit', 'obwohl', 'bevor', 'nachdem',
+                'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'ok', 'okay',
+                'auch', 'deswegen', 'also', 'wie', 'dann', 'wo',
+                'que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
+                'para que', 'ya que', 'pero', 'sino', 'o', 'y', 'ok', 'okey',
+                'that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
+                'since', 'unless', 'until', 'but', 'or', 'and', 'yet', 'ok', 'okay', 'okey'
+            ];
+
+            const commaRequiredWords = [
+                'was', 'die', 'das', 'als', 'den'
+            ];
+
+            const personalPronouns = [
+                'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'Sie',
+                'yo', 'tú', 'él', 'ella', 'usted', 'nosotros', 'nosotras', 'vosotros', 'vosotras', 'ellos', 'ellas', 'ustedes',
+                'i', 'you', 'he', 'she', 'it', 'we', 'they'
+            ];
+
+            const chunks = [];
+            let remainingText = text;
+            let iteration = 0;
+
+            while (remainingText.length > maxLength) {
+                iteration++;
+                console.log(`\nIteration ${iteration}: Processing ${remainingText.length} chars`);
+
+                let splitPoint = -1;
+                let strategy = '';
+
+                // BACKWARD SEARCH
+                console.log(`  Searching BACKWARD (${maxLength} → ${Math.floor(maxLength * 0.25)})...`);
+
+                // Strategy 1A: Sentence terminator backward
+                for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                    if (/[.!?]/.test(remainingText[j])) {
+                        splitPoint = j + 1;
+                        strategy = 'sentence terminator (backward)';
+                        break;
+                    }
+                }
+
+                // Strategy 1.5A: Comma + pronoun backward
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                        if (remainingText[j] === ',') {
+                            const afterComma = remainingText.substring(j + 1).trimStart();
+                            const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                            if (personalPronouns.includes(wordAfterComma)) {
+                                splitPoint = j + 1;
+                                strategy = `comma + pronoun "${wordAfterComma}" (backward)`;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 2A: Subordinate word backward
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                        if (remainingText[j] === ' ') {
+                            const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
+                            if (subordinateWords.includes(wordAfter)) {
+                                splitPoint = j + 1;
+                                strategy = `subordinate word "${wordAfter}" (backward)`;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 2.5A: Comma + comma-required word backward
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                        if (remainingText[j] === ',') {
+                            const afterComma = remainingText.substring(j + 1).trimStart();
+                            const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                            if (commaRequiredWords.includes(wordAfterComma)) {
+                                splitPoint = j + 1;
+                                strategy = `comma + word "${wordAfterComma}" (backward)`;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // FORWARD SEARCH
+                if (splitPoint === -1) {
+                    console.log(`  No split point found backward, searching FORWARD...`);
+
+                    // Strategy 1B: Sentence terminator forward
+                    // Limit search to 2x maxLength to avoid finding terminators too far away
+                    const maxSearchDistance = Math.min(remainingText.length, maxLength * 2);
+                    console.log(`  Forward search range: ${maxLength} → ${maxSearchDistance}`);
+
+                    for (let j = maxLength; j < maxSearchDistance; j++) {
+                        if (/[.!?]/.test(remainingText[j])) {
+                            splitPoint = j + 1;
+                            strategy = 'sentence terminator (forward)';
+                            break;
+                        }
+                    }
+
+                    // Strategy 1.5B: Comma + pronoun forward (limited range)
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ',') {
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (personalPronouns.includes(wordAfterComma)) {
+                                    splitPoint = j + 1;
+                                    strategy = `comma + pronoun "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2B: Subordinate word forward (limited range)
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ' ') {
+                                const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
+                                if (subordinateWords.includes(wordAfter)) {
+                                    splitPoint = j + 1;
+                                    strategy = `subordinate word "${wordAfter}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2.25B: Comma + comma-required word forward (limited range)
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ',') {
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (commaRequiredWords.includes(wordAfterComma)) {
+                                    splitPoint = j + 1;
+                                    strategy = `comma + word "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2.5B: Any comma forward
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < remainingText.length; j++) {
+                            if (remainingText[j] === ',') {
+                                splitPoint = j + 1;
+                                strategy = 'any comma (forward)';
+                                break;
+                            }
+                        }
+                    }
+
+                    // Strategy 3B: First space forward
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < remainingText.length; j++) {
+                            if (remainingText[j] === ' ') {
+                                splitPoint = j + 1;
+                                strategy = 'first space (forward)';
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 4: Search BACKWARDS for any space (to avoid splitting mid-word)
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= 0; j--) {
+                        if (remainingText[j] === ' ') {
+                            splitPoint = j + 1;
+                            strategy = 'any space (backward from MAX_LENGTH)';
+                            break;
+                        }
+                    }
+                }
+
+                // Strategy 5: Absolute last resort - force split
+                if (splitPoint === -1) {
+                    console.warn(`⚠️ WARNING: No spaces found! Forcing split at MAX_LENGTH`);
+                    splitPoint = maxLength;
+                    strategy = 'force at MAX_LENGTH (NO SPACES FOUND)';
+                }
+
+                const chunk = remainingText.substring(0, splitPoint).trim();
+                console.log(`  ✓ Split at position ${splitPoint} using: ${strategy}`);
+                console.log(`  ✓ Chunk ${iteration} length: ${chunk.length} chars`);
+                console.log(`  ✓ Preview: "${chunk.substring(0, 60)}${chunk.length > 60 ? '...' : ''}"`);
+
+                chunks.push(chunk);
+                remainingText = remainingText.substring(splitPoint).trim();
+            }
+
+            // Add remaining text
+            if (remainingText.length > 0) {
+                chunks.push(remainingText);
+                console.log(`\n✓ Final chunk: ${remainingText.length} chars`);
+            }
+
+            console.log('\n' + '='.repeat(80));
+            console.log(`✅ RESULT: Split into ${chunks.length} chunks`);
+            console.log('='.repeat(80));
+            chunks.forEach((chunk, idx) => {
+                console.log(`Chunk ${idx + 1} (${chunk.length} chars): "${chunk.substring(0, 80)}${chunk.length > 80 ? '...' : ''}"`);
+            });
+            console.log('='.repeat(80) + '\n');
+
+            return chunks;
+        }
+
+        function displayChunks(chunks, resultId) {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.innerHTML = '';
+
+            const summary = document.createElement('div');
+            summary.innerHTML = `<strong>Result:</strong> Split into ${chunks.length} chunks<br><br>`;
+            resultDiv.appendChild(summary);
+
+            chunks.forEach((chunk, idx) => {
+                const chunkDiv = document.createElement('div');
+                chunkDiv.className = 'chunk';
+                chunkDiv.innerHTML = `
+                    <div class="chunk-header">Chunk ${idx + 1} (${chunk.length} chars)</div>
+                    <div>${chunk}</div>
+                `;
+                resultDiv.appendChild(chunkDiv);
+            });
+        }
+
+        function runTest1() {
+            clearConsole();
+            console.log('🚀 Running Test 1: User\'s problematic line with MAX_LENGTH=100');
+            const chunks = testSplitAlgorithm(problemText, 100);
+            displayChunks(chunks, 'result1');
+        }
+
+        function runTest2() {
+            clearConsole();
+            console.log('🚀 Running Test 2: Same text with MAX_LENGTH=200');
+            const chunks = testSplitAlgorithm(problemText, 200);
+            displayChunks(chunks, 'result2');
+        }
+
+        function runTest3() {
+            clearConsole();
+            console.log('🚀 Running Test 3: Simple German sentence with MAX_LENGTH=50');
+            const chunks = testSplitAlgorithm(simpleText, 50);
+            displayChunks(chunks, 'result3');
+        }
+
+        function runAllTests() {
+            clearConsole();
+            console.log('🚀🚀🚀 Running ALL tests...\n');
+
+            console.log('=== TEST 1 ===');
+            const chunks1 = testSplitAlgorithm(problemText, 100);
+            displayChunks(chunks1, 'result1');
+
+            console.log('\n=== TEST 2 ===');
+            const chunks2 = testSplitAlgorithm(problemText, 200);
+            displayChunks(chunks2, 'result2');
+
+            console.log('\n=== TEST 3 ===');
+            const chunks3 = testSplitAlgorithm(simpleText, 50);
+            displayChunks(chunks3, 'result3');
+
+            console.log('\n✅ All tests completed!');
+        }
+
+        // Auto-run test 1 on load
+        window.addEventListener('load', () => {
+            console.log('✅ Test suite loaded. Click buttons to run tests or use runAllTests() in console.');
+            setTimeout(runTest1, 500);
+        });
+    </script>
+</body>
+</html>
