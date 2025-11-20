@@ -1541,6 +1541,37 @@
             }, 300);
         }
 
+        /**
+         * Convert SRT time format (HH:MM:SS,mmm) to total seconds
+         */
+        function timeToSeconds(timeString) {
+            const parts = timeString.split(':');
+            const hours = parseInt(parts[0]);
+            const minutes = parseInt(parts[1]);
+            const secondsParts = parts[2].split(',');
+            const seconds = parseInt(secondsParts[0]);
+            const milliseconds = parseInt(secondsParts[1] || 0);
+
+            return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
+        }
+
+        /**
+         * Convert total seconds to SRT time format (HH:MM:SS,mmm)
+         */
+        function secondsToTime(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            const milliseconds = Math.round((totalSeconds % 1) * 1000);
+
+            const hh = String(hours).padStart(2, '0');
+            const mm = String(minutes).padStart(2, '0');
+            const ss = String(seconds).padStart(2, '0');
+            const mmm = String(milliseconds).padStart(3, '0');
+
+            return `${hh}:${mm}:${ss},${mmm}`;
+        }
+
         function joinSentences() {
             const tableBody = document.getElementById('tableBody');
             const rows = tableBody.getElementsByTagName('tr');
@@ -1742,16 +1773,37 @@
                         // Multiple sentences found - split them
                         console.log(`  → Found ${sentences.length} sentences, splitting...`);
 
+                        // Calculate proportional time distribution based on sentence length
+                        const totalTextLength = sentences.reduce((sum, s) => sum + s.length, 0);
+
+                        // Convert time strings to seconds for calculation
+                        const startSeconds = timeToSeconds(startTime);
+                        const endSeconds = timeToSeconds(endTime);
+                        const totalDuration = endSeconds - startSeconds;
+
+                        let currentTimeOffset = 0;
                         for (let k = 0; k < sentences.length; k++) {
                             const sentence = sentences[k].trim();
                             if (sentence) {
+                                // Calculate this sentence's proportion of total time
+                                const sentenceLength = sentence.length;
+                                const proportionalDuration = (sentenceLength / totalTextLength) * totalDuration;
+
+                                const sentenceStartSeconds = startSeconds + currentTimeOffset;
+                                const sentenceEndSeconds = k === sentences.length - 1
+                                    ? endSeconds  // Last sentence gets exact end time
+                                    : startSeconds + currentTimeOffset + proportionalDuration;
+
                                 joined.push({
                                     number: joined.length + 1,
-                                    startTime: k === 0 ? startTime : endTime,
-                                    endTime: endTime,
+                                    startTime: secondsToTime(sentenceStartSeconds),
+                                    endTime: secondsToTime(sentenceEndSeconds),
                                     text: sentence,
                                     status: status
                                 });
+
+                                currentTimeOffset += proportionalDuration;
+                                console.log(`    Sentence ${k + 1}: ${secondsToTime(sentenceStartSeconds)} → ${secondsToTime(sentenceEndSeconds)} (${sentence.substring(0, 30)}...)`);
                             }
                         }
                     } else {
