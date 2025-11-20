@@ -662,7 +662,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.6 Subordinate Split</span>
+            <span class="version-badge">v3.7 Language Selector</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -690,6 +690,15 @@
                 <div class="delay-control">
                     <label for="maxJoinLines">Max lines:</label>
                     <input type="number" id="maxJoinLines" value="3" min="2" max="10" step="1">
+                </div>
+                <div class="delay-control">
+                    <label for="pageLanguage">Page Lang:</label>
+                    <select id="pageLanguage" onchange="changePageLanguage()" style="padding: 10px; border: 2px solid #4caf50; border-radius: 6px; font-size: 1em;">
+                        <option value="en">🇬🇧 EN</option>
+                        <option value="es">🇪🇸 ES</option>
+                        <option value="de">🇩🇪 DE</option>
+                        <option value="fr">🇫🇷 FR</option>
+                    </select>
                 </div>
                 <div class="stop-button-wrapper">
                     <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
@@ -1698,6 +1707,36 @@
             errorDiv.textContent = '❌ ' + message;
             errorDiv.classList.remove('hidden');
         }
+
+        // ============================================
+        // LANGUAGE SELECTOR
+        // ============================================
+
+        /**
+         * Change the page language attribute
+         * Updates document.documentElement.lang to help Google Translator detect the correct base language
+         */
+        function changePageLanguage() {
+            const selectedLang = document.getElementById('pageLanguage').value;
+            document.documentElement.lang = selectedLang;
+            console.log(`✓ Page language changed to: ${selectedLang}`);
+
+            // Save preference to localStorage
+            localStorage.setItem('pageLanguage', selectedLang);
+        }
+
+        // Restore saved language preference on page load
+        (function() {
+            const savedLang = localStorage.getItem('pageLanguage');
+            if (savedLang) {
+                const languageSelector = document.getElementById('pageLanguage');
+                if (languageSelector) {
+                    languageSelector.value = savedLang;
+                    document.documentElement.lang = savedLang;
+                    console.log(`✓ Restored language preference: ${savedLang}`);
+                }
+            }
+        })();
     </script>
 </body>
 </html>
