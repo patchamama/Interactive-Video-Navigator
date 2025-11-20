@@ -581,6 +581,18 @@
             color: #333;
         }
 
+        .cell-status {
+            width: 200px;
+            font-family: 'Courier New', monospace;
+            color: #9c27b0;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .cell-status.status-hidden {
+            display: none;
+        }
+
         .hidden {
             display: none !important;
         }
@@ -650,7 +662,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.1 Ultra-Fast</span>
+            <span class="version-badge">v3.2 Status-Based</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -675,6 +687,10 @@
                     <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
                         <span>💾</span>
                         <span>Export SRT</span>
+                    </button>
+                    <button id="toggleStatusColumn" class="export-button" onclick="toggleStatusColumn()" disabled style="background: #9c27b0;">
+                        <span>👁️</span>
+                        <span id="toggleStatusText">Hide Status</span>
                     </button>
                 </div>
             </div>
@@ -815,7 +831,7 @@
                         <th class="cell-time">Start</th>
                         <th class="cell-time">End</th>
                         <th class="cell-text">Text</th>
-                        <th class="cell-text" style="display: none;">Hidden Test</th>
+                        <th class="cell-status" id="statusColumnHeader">Status</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -832,10 +848,11 @@
         let smartScrollMode = true;
         let currentSubtitles = null;
         let currentFileName = null;
-        
-        // Virtual DOM system
-        let virtualDOM = [];
-        let lastCheckedIndex = 0;
+
+        // Status column tracking system
+        let statusColumnVisible = true;
+        let originalStatusText = '((Waiting, Espera, Warten))';
+        let lastFoundIndex = 0;
         let comparisonInterval = null;
         let noChangeTimeout = null;
 
@@ -858,9 +875,42 @@
                 document.title = 'SRT Parser - Smart Auto-Scroll';
                 return;
             }
-            
-            const percentage = Math.round((lastCheckedIndex / rows.length) * 100);
+
+            const percentage = Math.round((lastFoundIndex / rows.length) * 100);
             document.title = `${percentage}% - SRT Parser`;
+        }
+
+        function toggleStatusColumn() {
+            statusColumnVisible = !statusColumnVisible;
+
+            const header = document.getElementById('statusColumnHeader');
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            const toggleText = document.getElementById('toggleStatusText');
+
+            if (statusColumnVisible) {
+                // Show column
+                header.classList.remove('status-hidden');
+                for (let i = 0; i < rows.length; i++) {
+                    const statusCell = rows[i].cells[4];
+                    if (statusCell) {
+                        statusCell.classList.remove('status-hidden');
+                    }
+                }
+                toggleText.textContent = 'Hide Status';
+                console.log('✅ Status column is now VISIBLE');
+            } else {
+                // Hide column
+                header.classList.add('status-hidden');
+                for (let i = 0; i < rows.length; i++) {
+                    const statusCell = rows[i].cells[4];
+                    if (statusCell) {
+                        statusCell.classList.add('status-hidden');
+                    }
+                }
+                toggleText.textContent = 'Show Status';
+                console.log('🙈 Status column is now HIDDEN');
+            }
         }
 
         function showProcessingStatus(title, details = '') {
@@ -886,107 +936,51 @@
             if (detailsSpan) detailsSpan.textContent = details;
         }
 
-        // Create virtual DOM snapshot
-        function createVirtualDOM() {
-            const tableBody = document.getElementById('tableBody');
-            const rows = tableBody.getElementsByTagName('tr');
-            virtualDOM = [];
-
-            for (let i = 0; i < rows.length; i++) {
-                const textCell = rows[i].cells[3];
-                const hiddenCell = rows[i].cells[4]; // Hidden test column
-                virtualDOM.push({
-                    index: i,
-                    text: textCell ? textCell.textContent : '',
-                    hiddenText: hiddenCell ? hiddenCell.textContent : '',
-                    translated: false,
-                    hiddenTranslated: false
-                });
-            }
-
-            console.log(`📸 Virtual DOM created with ${virtualDOM.length} rows`);
-            return virtualDOM;
-        }
-
-        // Check for changes starting from lastCheckedIndex
+        // Check for changes using status column
         function checkForChanges() {
             if (!autoScrollActive) return;
 
             const tableBody = document.getElementById('tableBody');
             const rows = tableBody.getElementsByTagName('tr');
 
-            let lastChangedRow = -1;
+            // Search from lastFoundIndex onwards for the first unchanged status
+            for (let i = lastFoundIndex; i < rows.length; i++) {
+                const statusCell = rows[i].cells[4];
+                if (!statusCell) continue;
 
-            // Continue checking from lastCheckedIndex until we find an unchanged row
-            for (let i = lastCheckedIndex; i < rows.length; i++) {
-                const textCell = rows[i].cells[3];
-                const hiddenCell = rows[i].cells[4];
-                if (!textCell) continue;
+                const currentStatusText = statusCell.textContent.trim();
 
-                const currentText = textCell.textContent;
-                const virtualText = virtualDOM[i] ? virtualDOM[i].text : '';
+                // Check if this row still has the original status text (not translated)
+                if (currentStatusText === originalStatusText) {
+                    // Found a row that hasn't been translated yet
+                    console.log(`\n✅ Found UNCHANGED status at row #${i + 1}`);
+                    console.log(`   Status text: "${currentStatusText}"`);
+                    console.log(`   Waiting for translation...`);
 
-                const currentHiddenText = hiddenCell ? hiddenCell.textContent : '';
-                const virtualHiddenText = virtualDOM[i] ? virtualDOM[i].hiddenText : '';
+                    // Move to this row
+                    lastFoundIndex = i;
+                    scrollToRow(i);
 
-                // Check hidden column for changes (for testing translator behavior)
-                if (currentHiddenText !== virtualHiddenText && !virtualDOM[i].hiddenTranslated) {
-                    console.log(`\n🔬 HIDDEN COLUMN MODIFIED at row #${i + 1}`);
-                    console.log(`   Original hidden text: "${virtualHiddenText}"`);
-                    console.log(`   Modified hidden text: "${currentHiddenText}"`);
-                    console.log(`   ⚠️ Translator is modifying the hidden test column!`);
-
-                    virtualDOM[i].hiddenText = currentHiddenText;
-                    virtualDOM[i].hiddenTranslated = true;
-                }
-
-                // Detect change in main text
-                if (currentText !== virtualText && !virtualDOM[i].translated) {
-                    console.log(`\n🔍 CHANGE DETECTED at row #${i + 1}`);
-                    console.log(`   Original: "${virtualText.substring(0, 50)}..."`);
-                    console.log(`   Translated: "${currentText.substring(0, 50)}..."`);
-
-                    // Update virtual DOM
-                    virtualDOM[i].text = currentText;
-                    virtualDOM[i].translated = true;
-
-                    // Track this as the last changed row
-                    lastChangedRow = i;
-
-                    // Continue to next row without breaking
-                    continue;
-                }
-
-                // Found a row that hasn't changed - this is our stopping point
-                if (currentText === virtualText) {
-                    if (lastChangedRow >= 0) {
-                        // We found changed rows, now show the last one
-                        console.log(`\n📍 Found unchanged row at #${i + 1}, stopping at last changed row #${lastChangedRow + 1}`);
-
-                        // Move to the last changed row
-                        lastCheckedIndex = lastChangedRow + 1;
-                        scrollToRow(lastChangedRow);
-
-                        // Reset no-change timeout
-                        if (noChangeTimeout) {
-                            clearTimeout(noChangeTimeout);
-                        }
-                        startNoChangeTimeout();
-
-                        // Update status
-                        updateProcessingStatus('🔄 Translation detected', `Row #${lastChangedRow + 1} translated - Continuing...`);
-                        updateProgress();
-
-                        return; // Exit and wait for next check
-                    } else {
-                        // No changes found yet, continue checking
-                        break;
+                    // Reset no-change timeout
+                    if (noChangeTimeout) {
+                        clearTimeout(noChangeTimeout);
                     }
+                    startNoChangeTimeout();
+
+                    // Update status
+                    updateProcessingStatus('⏳ Waiting for translation', `Row #${i + 1} - Status: "${currentStatusText}"`);
+                    updateProgress();
+
+                    return; // Exit and wait for next check
+                }
+                else {
+                    // This row has been translated, log it and continue searching
+                    console.log(`🔄 Row #${i + 1} translated - Status changed from "${originalStatusText}" to "${currentStatusText}"`);
                 }
             }
 
             // Reached the end of the document
-            if (lastCheckedIndex >= rows.length) {
+            if (lastFoundIndex >= rows.length - 1) {
                 console.log('\n🏁 END OF DOCUMENT - All rows checked');
                 console.log('💾 Exporting translated file...');
                 stopDOMComparison();
@@ -1034,17 +1028,17 @@
         }
 
         function startDOMComparison() {
-            // Create initial snapshot
-            createVirtualDOM();
-            lastCheckedIndex = 0;
+            // Initialize tracking
+            lastFoundIndex = 0;
 
-            console.log('🚀 Starting DOM comparison...');
+            console.log('🚀 Starting status column monitoring...');
             console.log(`   Continuous execution mode (no delay)`);
-            console.log(`   Starting from row #${lastCheckedIndex + 1}`);
-            console.log(`   Hidden test column: "((Waiting, Espera, Warten))"`);
+            console.log(`   Starting from row #${lastFoundIndex + 1}`);
+            console.log(`   Looking for status: "${originalStatusText}"`);
+            console.log(`   Status column visible: ${statusColumnVisible ? 'YES' : 'NO'}`);
 
             // Show status
-            showProcessingStatus('🔄 Smart scroll active', `Monitoring row #${lastCheckedIndex + 1} - Waiting for translation...`);
+            showProcessingStatus('🔄 Smart scroll active', `Monitoring row #${lastFoundIndex + 1} - Waiting for translation...`);
 
             // Start continuous checking loop
             function continuousCheck() {
@@ -1398,16 +1392,16 @@
                 const cellStart = row.insertCell(1);
                 const cellEnd = row.insertCell(2);
                 const cellText = row.insertCell(3);
-                const cellHidden = row.insertCell(4); // Hidden test column
+                const cellStatus = row.insertCell(4); // Status column
 
                 cellNumber.textContent = sub.number;
                 cellStart.textContent = sub.startTime;
                 cellEnd.textContent = sub.endTime;
                 cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
 
-                // Add hidden test text - this should NOT be translated
-                cellHidden.textContent = '((Waiting, Espera, Warten))';
-                cellHidden.style.display = 'none';
+                // Add status text - visible by default, will be translated by browser
+                cellStatus.textContent = originalStatusText;
+                cellStatus.className = 'cell-status';
             });
 
             document.getElementById('totalSubs').textContent = subtitles.length.toLocaleString();
@@ -1422,6 +1416,7 @@
             document.getElementById('tableContainer').classList.remove('hidden');
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('exportButton').disabled = false;
+            document.getElementById('toggleStatusColumn').disabled = false;
             
             setTimeout(() => {
                 const firstRow = tbody.getElementsByTagName('tr')[0];
