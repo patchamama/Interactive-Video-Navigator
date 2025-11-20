@@ -591,9 +591,20 @@
             animation: highlight-fade 2s ease-out;
         }
 
+        .subtitle-table tbody tr.losstime-highlight {
+            background-color: #ffcccc;
+            animation: losstime-highlight-fade 2s ease-out;
+            border: 2px solid #ff5555;
+        }
+
         @keyframes highlight-fade {
             0% { background-color: #ffc107; }
             100% { background-color: #fff3cd; }
+        }
+
+        @keyframes losstime-highlight-fade {
+            0% { background-color: #ff0000; }
+            100% { background-color: #ffcccc; }
         }
 
         .cell-number {
@@ -694,7 +705,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.9.1 Enhanced Split</span>
+            <span class="version-badge">v3.9.2 Search Losstime</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -745,6 +756,10 @@
                     </select>
                 </div>
                 <div class="stop-button-wrapper">
+                    <button id="searchLosstimeButton" class="export-button" onclick="searchNextLosstime()" disabled style="background: #ff9800; margin-right: 10px;">
+                        <span>🔍</span>
+                        <span>Search Losstime...</span>
+                    </button>
                     <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
                         <span>💾</span>
                         <span>Export SRT</span>
@@ -905,6 +920,7 @@
         let smartScrollMode = true;
         let currentSubtitles = null;
         let currentFileName = null;
+        let lastLosstimeSearchIndex = -1; // Track last search position for losstime
 
         // Status column tracking system
         let originalStatusText = '((Waiting, Espera, Warten))';
@@ -1560,7 +1576,8 @@
             document.getElementById('tableContainer').classList.remove('hidden');
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('exportButton').disabled = false;
-            
+            document.getElementById('searchLosstimeButton').disabled = false;
+
             setTimeout(() => {
                 const firstRow = tbody.getElementsByTagName('tr')[0];
                 if (firstRow) {
@@ -2250,6 +2267,94 @@
             const errorDiv = document.getElementById('error');
             errorDiv.textContent = '❌ ' + message;
             errorDiv.classList.remove('hidden');
+        }
+
+        // ============================================
+        // SEARCH LOSSTIME (INVISIBLE SUBTITLES)
+        // ============================================
+
+        /**
+         * Search for next subtitle with equal start and end time (invisible subtitle)
+         * Scrolls to and highlights the found row
+         */
+        function searchNextLosstime() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles loaded');
+                return;
+            }
+
+            // Start searching from position after last found
+            const startIndex = lastLosstimeSearchIndex + 1;
+            let foundIndex = -1;
+
+            console.log(`\n🔍 Searching for losstime from row ${startIndex + 1}...`);
+
+            // Search from current position to end
+            for (let i = startIndex; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const startTime = cells[1].textContent;
+                const endTime = cells[2].textContent;
+
+                if (startTime === endTime) {
+                    foundIndex = i;
+                    console.log(`  ⚠ Found losstime at row ${i + 1}: ${startTime} === ${endTime}`);
+                    break;
+                }
+            }
+
+            // If not found from current position, wrap around and search from beginning
+            if (foundIndex === -1 && startIndex > 0) {
+                console.log('  No losstime found after current position, wrapping to beginning...');
+                for (let i = 0; i < startIndex; i++) {
+                    const cells = rows[i].cells;
+                    const startTime = cells[1].textContent;
+                    const endTime = cells[2].textContent;
+
+                    if (startTime === endTime) {
+                        foundIndex = i;
+                        console.log(`  ⚠ Found losstime at row ${i + 1}: ${startTime} === ${endTime}`);
+                        break;
+                    }
+                }
+            }
+
+            if (foundIndex !== -1) {
+                // Found a losstime subtitle
+                lastLosstimeSearchIndex = foundIndex;
+
+                // Remove previous highlight
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].classList.remove('losstime-highlight');
+                }
+
+                // Highlight found row
+                rows[foundIndex].classList.add('losstime-highlight');
+
+                // Scroll to the row
+                rows[foundIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Show notification
+                const rowNumber = foundIndex + 1;
+                const startTime = rows[foundIndex].cells[1].textContent;
+                const text = rows[foundIndex].cells[3].textContent.substring(0, 50);
+
+                console.log(`✅ Navigated to row ${rowNumber}`);
+                updateProcessingStatus(
+                    `🔍 Losstime found at row ${rowNumber}`,
+                    `Time: ${startTime} | Text: "${text}..."`
+                );
+
+                setTimeout(() => hideProcessingStatus(), 3000);
+            } else {
+                // No losstime found
+                console.log('✅ No losstime subtitles found in document');
+                lastLosstimeSearchIndex = -1; // Reset for next search
+
+                alert('No invisible subtitles (losstime) found!\n\nAll subtitles have valid time ranges.');
+            }
         }
 
         // ============================================
