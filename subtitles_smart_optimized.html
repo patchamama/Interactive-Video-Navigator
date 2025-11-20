@@ -1509,21 +1509,17 @@
         }
 
         /**
-         * Toggle Split Longlines button
+         * Execute Split Longlines on current subtitle state
+         * Each click applies the split algorithm again on the current content
          */
         function toggleSplitLonglines() {
-            const button = document.getElementById('splitLonglinesButton');
-            button.classList.toggle('active');
-
-            if (button.classList.contains('active')) {
-                splitLonglines();
-            } else {
-                reprocessSubtitles();
-            }
+            // Always execute split, allowing multiple consecutive applications
+            splitLonglines();
         }
 
         /**
          * Check if Split Longlines is active
+         * Note: This function kept for compatibility, but Split Longlines now executes on each click
          */
         function isSplitLonglinesActive() {
             return document.getElementById('splitLonglinesButton').classList.contains('active');
