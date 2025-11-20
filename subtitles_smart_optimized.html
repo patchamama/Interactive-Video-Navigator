@@ -685,6 +685,19 @@
             }
         }
     </style>
+
+    <!-- Google Translate Script -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'auto',
+                includedLanguages: 'de,en,es,fr,it,pt,ru,zh,ja,ko,ar,hi',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </head>
 <body>
     <!-- Floating Stop Button -->
@@ -755,6 +768,8 @@
                         <option value="fr">🇫🇷 FR</option>
                     </select>
                 </div>
+                <!-- Google Translate Widget -->
+                <div id="google_translate_element" style="margin-top: 10px;"></div>
                 <div class="stop-button-wrapper">
                     <button id="searchLosstimeButton" class="export-button" onclick="searchNextLosstime()" disabled style="background: #ff9800; margin-right: 10px;">
                         <span>🔍</span>
@@ -1174,9 +1189,12 @@
         }
 
         function startAutoScroll() {
+            // Scroll to top of document
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
             const tableBody = document.getElementById('tableBody');
             const rows = tableBody.getElementsByTagName('tr');
-            
+
             if (rows.length === 0) {
                 alert('Please load an SRT file first');
                 return;
@@ -2252,19 +2270,63 @@
             setTimeout(() => hideProcessingStatus(), 2000);
         }
 
+        /**
+         * Generate output filename with target language extension
+         * Examples:
+         *   de.srt → es.srt (if target is 'es')
+         *   training_de.srt → training_es.srt
+         *   subtitles.srt → subtitles_es.srt (no language code found)
+         */
+        function generateOutputFilename(originalFilename) {
+            if (!originalFilename) {
+                const targetLang = document.getElementById('pageLanguage').value;
+                return `subtitles_${targetLang}.srt`;
+            }
+
+            const targetLang = document.getElementById('pageLanguage').value;
+
+            // Common language codes to detect
+            const langCodes = ['de', 'en', 'es', 'fr', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi'];
+
+            // Try to find pattern like "_de.srt" or ".de.srt"
+            let replaced = false;
+            for (const langCode of langCodes) {
+                // Match patterns: _de.srt or .de.srt
+                const pattern1 = new RegExp(`_${langCode}\\.srt$`, 'i');
+                const pattern2 = new RegExp(`\\.${langCode}\\.srt$`, 'i');
+
+                if (pattern1.test(originalFilename)) {
+                    originalFilename = originalFilename.replace(pattern1, `_${targetLang}.srt`);
+                    replaced = true;
+                    break;
+                } else if (pattern2.test(originalFilename)) {
+                    originalFilename = originalFilename.replace(pattern2, `.${targetLang}.srt`);
+                    replaced = true;
+                    break;
+                }
+            }
+
+            // If no language code found, add target language before .srt
+            if (!replaced) {
+                originalFilename = originalFilename.replace('.srt', `_${targetLang}.srt`);
+            }
+
+            return originalFilename;
+        }
+
         function exportSRT() {
             const tableBody = document.getElementById('tableBody');
             const rows = tableBody.getElementsByTagName('tr');
-            
+
             if (rows.length === 0) {
                 alert('No subtitles to export');
                 return;
             }
-            
+
             showProcessingStatus('💾 Exporting SRT file...', 'Generating file content');
-            
+
             let srtContent = '';
-            
+
             for (let i = 0; i < rows.length; i++) {
                 const cells = rows[i].cells;
                 const number = cells[0].textContent;
@@ -2274,30 +2336,30 @@
                     .replace(/<br\s*\/?>/gi, '\n')
                     .replace(/<[^>]+>/g, '')
                     .trim();
-                
+
                 srtContent += `${number}\n${startTime} --> ${endTime}\n${text}\n\n`;
-                
+
                 if (i % 50 === 0 && i > 0) {
                     const progress = Math.round((i / rows.length) * 100);
                     updateProcessingStatus('💾 Exporting SRT file...', `Progress: ${progress}% (${i}/${rows.length})`);
                 }
             }
-            
+
             updateProcessingStatus('💾 Creating download...', 'Almost done');
-            
+
             const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = currentFileName ? currentFileName.replace('.srt', '_translated.srt') : 'subtitles_translated.srt';
+            a.download = generateOutputFilename(currentFileName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
+
             console.log('✅ SRT file exported successfully');
             updateProcessingStatus('✅ Export complete!', 'File downloaded successfully');
-            
+
             setTimeout(() => hideProcessingStatus(), 2000);
         }
 
@@ -2400,7 +2462,7 @@
         // ============================================
 
         /**
-         * Change the page language attribute
+         * Change the page language attribute and activate Google Translate
          * Updates document.documentElement.lang to help Google Translator detect the correct base language
          */
         function changePageLanguage() {
@@ -2410,6 +2472,38 @@
 
             // Save preference to localStorage
             localStorage.setItem('pageLanguage', selectedLang);
+
+            // Trigger Google Translate programmatically
+            triggerGoogleTranslate(selectedLang);
+        }
+
+        /**
+         * Attempt to programmatically trigger Google Translate to the selected language
+         * This function tries to manipulate the Google Translate widget to activate translation
+         */
+        function triggerGoogleTranslate(targetLang) {
+            // Wait for Google Translate to be fully loaded
+            setTimeout(() => {
+                try {
+                    // Try to find the Google Translate select element
+                    const gtSelect = document.querySelector('.goog-te-combo');
+                    if (gtSelect) {
+                        // Set the value to target language
+                        gtSelect.value = targetLang;
+
+                        // Trigger change event to activate translation
+                        const event = new Event('change', { bubbles: true });
+                        gtSelect.dispatchEvent(event);
+
+                        console.log(`🌐 Google Translate activated for language: ${targetLang}`);
+                    } else {
+                        console.warn('⚠️ Google Translate widget not found yet. Please use the widget manually or try again.');
+                    }
+                } catch (error) {
+                    console.error('❌ Error activating Google Translate:', error);
+                    console.log('💡 Tip: You can use the Google Translate widget above manually.');
+                }
+            }, 1000); // Wait 1 second for widget to be ready
         }
 
         // Restore saved language preference on page load
