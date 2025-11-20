@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Video Navigator - Demo & Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 60px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .tool-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            text-decoration: none;
+            transition: all 0.3s;
+            border: 3px solid transparent;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            border-color: #667eea;
+        }
+
+        .tool-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .tool-title {
+            font-size: 1.5em;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .tool-description {
+            color: #666;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .github-link {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+
+        .github-button {
+            display: inline-block;
+            background: #333;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .github-button:hover {
+            background: #555;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Interactive Video Navigator</h1>
+        <p>Advanced tools for video navigation, subtitle management, and intelligent indexing</p>
+
+        <div class="tools-grid">
+            <a href="Interactive_Video_Navigator.html" class="tool-card">
+                <div class="tool-icon">📹</div>
+                <div class="tool-title">Video Navigator</div>
+                <div class="tool-description">
+                    Navigate videos with timestamped indexes and synchronized subtitles. Supports YouTube and local videos.
+                </div>
+                <div class="version-badge">v2.2.1</div>
+            </a>
+
+            <a href="subtitles_smart_optimized.html" class="tool-card">
+                <div class="tool-icon">🤖</div>
+                <div class="tool-title">Smart Subtitle Processor</div>
+                <div class="tool-description">
+                    AI-powered subtitle translation with smart auto-scroll. Detects translation changes in real-time.
+                </div>
+                <div class="version-badge">v3.2 Status-Based</div>
+            </a>
+        </div>
+
+        <div class="github-link">
+            <a href="https://github.com/patchamama/Interactive-Video-Navigator" class="github-button" target="_blank">
+                ⭐ View on GitHub
+            </a>
+        </div>
+    </div>
+</body>
+</html>
