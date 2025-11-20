@@ -1600,35 +1600,65 @@
                     console.log(`✓ Joined rows ${i + 1} to ${j + 1} (${linesJoined} lines)`);
 
                     // Split by real sentence terminators (respecting abbreviations)
-                    // This is a simple approach - just keep as one sentence if it contains abbreviations
                     const sentences = [];
-                    let tempSentence = '';
-                    const parts = currentText.split(/([.!?]\.{0,2})/);
+                    let currentSentence = '';
 
-                    for (let k = 0; k < parts.length; k++) {
-                        const part = parts[k];
-                        tempSentence += part;
+                    // Iterate through characters to find sentence boundaries
+                    for (let charIdx = 0; charIdx < currentText.length; charIdx++) {
+                        const char = currentText[charIdx];
+                        currentSentence += char;
 
-                        // Check if this is a terminator and not part of abbreviation
-                        if (/^[.!?]\.{0,2}$/.test(part)) {
-                            // Check if the sentence before this terminator ends with abbreviation
-                            const beforeTerminator = tempSentence.substring(0, tempSentence.length - part.length).trim();
-                            const isAbbrev = abbreviations.some(abbr => {
-                                const regex = new RegExp(`\\b${abbr}\\.?\\s*$`, 'i');
-                                return regex.test(beforeTerminator);
-                            });
+                        // Check if we're at a potential sentence terminator
+                        if (char === '.' || char === '!' || char === '?') {
+                            // Look ahead to see if there are more dots (like ...)
+                            let extraDots = 0;
+                            while (charIdx + 1 + extraDots < currentText.length &&
+                                   currentText[charIdx + 1 + extraDots] === '.') {
+                                currentSentence += '.';
+                                extraDots++;
+                                charIdx++;
+                            }
 
-                            if (!isAbbrev) {
-                                // Real sentence end
-                                sentences.push(tempSentence.trim());
-                                tempSentence = '';
+                            // Check if the next character is a space or end of string
+                            const nextChar = currentText[charIdx + 1];
+                            const isEndOrSpace = !nextChar || /\s/.test(nextChar);
+
+                            if (isEndOrSpace) {
+                                // Check if this is part of an abbreviation
+                                const textBeforeTerminator = currentSentence.substring(0, currentSentence.length - 1 - extraDots).trim();
+                                const isAbbrev = abbreviations.some(abbr => {
+                                    const regex = new RegExp(`\\b${abbr}$`, 'i');
+                                    return regex.test(textBeforeTerminator);
+                                });
+
+                                if (!isAbbrev && char !== '.') {
+                                    // Definite sentence end (! or ?)
+                                    sentences.push(currentSentence.trim());
+                                    currentSentence = '';
+                                } else if (!isAbbrev && char === '.') {
+                                    // Period that's not an abbreviation
+                                    // Check if next non-space character is uppercase (new sentence)
+                                    let nextNonSpace = '';
+                                    for (let ahead = charIdx + 1; ahead < currentText.length; ahead++) {
+                                        if (!/\s/.test(currentText[ahead])) {
+                                            nextNonSpace = currentText[ahead];
+                                            break;
+                                        }
+                                    }
+
+                                    // If next character is uppercase or end of text, it's a sentence boundary
+                                    if (!nextNonSpace || /[A-ZÄÖÜ]/.test(nextNonSpace)) {
+                                        sentences.push(currentSentence.trim());
+                                        currentSentence = '';
+                                    }
+                                }
                             }
                         }
                     }
 
                     // Add remaining text as last sentence
-                    if (tempSentence.trim()) {
-                        sentences.push(tempSentence.trim());
+                    if (currentSentence.trim()) {
+                        sentences.push(currentSentence.trim());
                     }
 
                     if (sentences.length > 1) {
