@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRT Parser - Smart Auto-Scroll</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .auto-scroll-section {
+            padding: 10px 20px;
+            background: #e8f5e9;
+            border-bottom: 2px solid #4caf50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .auto-scroll-section.compact {
+            padding: 15px 20px;
+            background: #4caf50;
+            display: none;
+        }
+
+        .floating-stop-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: none;
+            padding: 15px 30px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+            transition: all 0.3s;
+        }
+
+        .floating-stop-button:hover {
+            background: #da190b;
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.6);
+        }
+
+        .floating-stop-button.visible {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stop-button-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .export-button {
+            padding: 10px 25px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .export-button:hover {
+            background: #1976d2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+        }
+
+        .export-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .version-badge {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 0.7em;
+            color: #2e7d32;
+            background: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            border: 1px solid #4caf50;
+            font-weight: 600;
+        }
+
+        .controls-row {
+            display: grid;
+            grid-template-columns: auto auto auto auto;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .controls-line {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            margin-top: 80px;
+            transition: margin-top 0.3s;
+        }
+
+        .header.no-controls {
+            margin-top: 0;
+        }
+
+        .auto-scroll-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .scroll-button {
+            padding: 12px 30px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .scroll-button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .scroll-button.active {
+            background: #f44336;
+        }
+
+        .scroll-button.active:hover {
+            background: #da190b;
+        }
+
+        .delay-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .delay-control label {
+            font-weight: 600;
+            color: #2e7d32;
+        }
+
+        .delay-control input {
+            width: 80px;
+            padding: 10px;
+            border: 2px solid #4caf50;
+            border-radius: 6px;
+            font-size: 1em;
+            text-align: center;
+        }
+
+        .delay-control span {
+            color: #555;
+        }
+
+        .scroll-status {
+            padding: 8px 16px;
+            background: white;
+            border-radius: 6px;
+            font-weight: 600;
+            color: #2e7d32;
+            border: 2px solid #4caf50;
+            font-size: 0.9em;
+        }
+
+        .scroll-status.detecting {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .processing-status {
+            padding: 20px 40px;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
+            border-left: 5px solid #ffc107;
+            margin: 0;
+            text-align: center;
+            font-weight: 600;
+            color: #856404;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 999;
+        }
+
+        .processing-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .processing-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ffc107;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        .processing-title {
+            font-size: 1.3em;
+            color: #f57c00;
+            font-weight: 700;
+        }
+
+        .processing-details {
+            font-size: 0.95em;
+            color: #856404;
+            opacity: 0.9;
+        }
+
+        .checkbox-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-control input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #4caf50;
+        }
+
+        .checkbox-control label {
+            font-weight: 600;
+            color: #2e7d32;
+            cursor: pointer;
+        }
+
+        .mode-indicator {
+            padding: 8px 16px;
+            background: white;
+            border-radius: 6px;
+            font-weight: 600;
+            border: 2px solid #2196f3;
+            color: #1565c0;
+            font-size: 0.85em;
+        }
+
+        .mode-indicator.smart {
+            border-color: #ff9800;
+            color: #e65100;
+        }
+
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .upload-box {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 60px 40px;
+            background: white;
+            transition: all 0.3s;
+            cursor: pointer;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .upload-box:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+        }
+
+        .upload-box.dragover {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .upload-box h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+        }
+
+        .upload-box p {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 25px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.1em;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .file-label:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .info-section {
+            padding: 30px 40px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            border-left: 5px solid #667eea;
+            margin: 0;
+        }
+
+        .info-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .language-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .language-tab {
+            padding: 10px 25px;
+            background: white;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            font-size: 1em;
+        }
+
+        .language-tab:hover {
+            background: #f0f0f0;
+        }
+
+        .language-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .info-content {
+            display: none;
+        }
+
+        .info-content.active {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            text-align: left;
+        }
+
+        .info-language {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-language h3 {
+            color: #764ba2;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-language ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-language li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-language li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-icon {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .table-container {
+            padding: 40px;
+            overflow-x: auto;
+        }
+
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px 40px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .subtitle-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .subtitle-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .subtitle-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .subtitle-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .subtitle-table tbody tr {
+            transition: background-color 0.2s;
+        }
+
+        .subtitle-table tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+
+        .subtitle-table tbody tr.highlight {
+            background-color: #fff3cd;
+            animation: highlight-fade 2s ease-out;
+        }
+
+        @keyframes highlight-fade {
+            0% { background-color: #ffc107; }
+            100% { background-color: #fff3cd; }
+        }
+
+        .cell-number {
+            width: 80px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .cell-time {
+            width: 180px;
+            font-family: 'Courier New', monospace;
+            color: #666;
+        }
+
+        .cell-text {
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .cell-status {
+            width: 140px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .status-waiting {
+            color: #ff9800;
+            background: #fff3cd;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            display: inline-block;
+        }
+
+        .status-ready {
+            color: #4caf50;
+            background: #e8f5e9;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            display: inline-block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            margin: 20px 40px;
+            border-radius: 8px;
+            border-left: 4px solid #c62828;
+        }
+
+        .loading-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 768px) {
+            .info-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .subtitle-table th,
+            .subtitle-table td {
+                padding: 10px;
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Floating Stop Button -->
+    <button id="floatingStopButton" class="floating-stop-button" onclick="stopAutoScroll()">
+        <span>⏸️</span>
+        <span>STOP</span>
+    </button>
+
+    <div class="container">
+        <!-- Fixed Auto-Scroll Control Section -->
+        <div class="auto-scroll-section" id="autoScrollSection">
+            <span class="version-badge">v2.2 Smart</span>
+            <div class="controls-row">
+                <div class="auto-scroll-controls">
+                    <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
+                        <span id="scrollIcon">▶️</span>
+                        <span id="scrollButtonText">Start</span>
+                    </button>
+                    <div class="delay-control">
+                        <label for="scrollDelay">Delay:</label>
+                        <input type="number" id="scrollDelay" value="3" min="1" max="60" step="0.5">
+                        <span>sec</span>
+                    </div>
+                </div>
+                <div class="checkbox-control">
+                    <input type="checkbox" id="smartScrollMode" checked onchange="updateScrollMode()">
+                    <label for="smartScrollMode">Smart</label>
+                </div>
+                <div class="checkbox-control">
+                    <input type="checkbox" id="improveYouTubeSubs" onchange="reprocessSubtitles()">
+                    <label for="improveYouTubeSubs">YouTube</label>
+                </div>
+                <div class="stop-button-wrapper">
+                    <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
+                        <span>💾</span>
+                        <span>Export SRT</span>
+                    </button>
+                    <div id="scrollStatusContainer">
+                        <div id="scrollStatus" class="scroll-status">Inactive</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Status -->
+        <div id="processingStatus" class="processing-status hidden">
+            <div class="processing-status-row">
+                <div class="processing-spinner"></div>
+                <span id="processingTitle" class="processing-title">Processing...</span>
+            </div>
+            <span id="processingDetails" class="processing-details"></span>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h1>📝 SRT Parser & Visualizer</h1>
+            <p>Load your .srt subtitle file to visualize it with Smart Auto-Scroll</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <div class="upload-icon">📁</div>
+                <h2>Drag your file here</h2>
+                <p>or click to select a .srt file</p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" class="file-input" accept=".srt" onchange="handleFile(this.files[0])">
+                    <label for="fileInput" class="file-label">Select File</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div id="infoSection" class="info-section">
+            <h2>✨ Smart Auto-Scroll Features</h2>
+            <div class="language-tabs">
+                <button class="language-tab active" onclick="switchLanguage('en')">🇬🇧 English</button>
+                <button class="language-tab" onclick="switchLanguage('es')">🇪🇸 Español</button>
+                <button class="language-tab" onclick="switchLanguage('de')">🇩🇪 Deutsch</button>
+            </div>
+            
+            <!-- English Content -->
+            <div id="info-en" class="info-content active">
+                <div class="info-language">
+                    <h3>🧠 Smart Mode</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Automatically detects subtitle changes</li>
+                        <li><span class="feature-icon">✓</span> Advances immediately upon detecting modifications</li>
+                        <li><span class="feature-icon">✓</span> Removes ((pending)) markers after translation</li>
+                        <li><span class="feature-icon">✓</span> No unnecessary delays</li>
+                        <li><span class="feature-icon">✓</span> Faster and more efficient process</li>
+                    </ul>
+                </div>
+                <div class="info-language">
+                    <h3>⚙️ Manual Mode</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Uses fixed time delay</li>
+                        <li><span class="feature-icon">✓</span> Advances every X configurable seconds</li>
+                        <li><span class="feature-icon">✓</span> Useful for paused manual review</li>
+                        <li><span class="feature-icon">✓</span> Precise speed control</li>
+                        <li><span class="feature-icon">✓</span> Compatible with any workflow</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Spanish Content -->
+            <div id="info-es" class="info-content">
+                <div class="info-language">
+                    <h3>🧠 Modo Inteligente</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Detecta automáticamente cambios en subtítulos</li>
+                        <li><span class="feature-icon">✓</span> Avanza inmediatamente al detectar modificaciones</li>
+                        <li><span class="feature-icon">✓</span> Elimina marcadores ((pending)) tras traducción</li>
+                        <li><span class="feature-icon">✓</span> No espera delays innecesarios</li>
+                        <li><span class="feature-icon">✓</span> Proceso más rápido y eficiente</li>
+                    </ul>
+                </div>
+                <div class="info-language">
+                    <h3>⚙️ Modo Manual</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Usa delay de tiempo fijo</li>
+                        <li><span class="feature-icon">✓</span> Avanza cada X segundos configurables</li>
+                        <li><span class="feature-icon">✓</span> Útil para revisión manual pausada</li>
+                        <li><span class="feature-icon">✓</span> Control de velocidad preciso</li>
+                        <li><span class="feature-icon">✓</span> Compatible con cualquier workflow</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- German Content -->
+            <div id="info-de" class="info-content">
+                <div class="info-language">
+                    <h3>🧠 Intelligenter Modus</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Erkennt automatisch Untertiteländerungen</li>
+                        <li><span class="feature-icon">✓</span> Springt sofort weiter bei Änderungen</li>
+                        <li><span class="feature-icon">✓</span> Entfernt ((pending)) Markierungen nach Übersetzung</li>
+                        <li><span class="feature-icon">✓</span> Keine unnötigen Verzögerungen</li>
+                        <li><span class="feature-icon">✓</span> Schnellerer und effizienterer Prozess</li>
+                    </ul>
+                </div>
+                <div class="info-language">
+                    <h3>⚙️ Manueller Modus</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Verwendet feste Zeitverzögerung</li>
+                        <li><span class="feature-icon">✓</span> Springt alle X konfigurierbaren Sekunden weiter</li>
+                        <li><span class="feature-icon">✓</span> Nützlich für pausierte manuelle Überprüfung</li>
+                        <li><span class="feature-icon">✓</span> Präzise Geschwindigkeitskontrolle</li>
+                        <li><span class="feature-icon">✓</span> Kompatibel mit jedem Workflow</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error" class="error-message hidden"></div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading-indicator hidden">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading subtitles...</div>
+        </div>
+
+        <!-- Statistics Section -->
+        <div id="stats" class="stats-section hidden">
+            <div class="stat-card">
+                <div class="stat-value" id="totalSubs">0</div>
+                <div class="stat-label">Total Subtitles</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="duration">00:00:00</div>
+                <div class="stat-label">Total Duration</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="fileName">-</div>
+                <div class="stat-label">File</div>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div id="tableContainer" class="table-container hidden">
+            <table class="subtitle-table">
+                <thead>
+                    <tr>
+                        <th class="cell-number">#</th>
+                        <th class="cell-time">Start</th>
+                        <th class="cell-time">End</th>
+                        <th class="cell-text">Text</th>
+                        <th class="cell-status">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let autoScrollInterval = null;
+        let autoScrollActive = false;
+        let currentRowIndex = 0;
+        let mutationObserver = null;
+        let smartScrollMode = true;
+        let currentSubtitles = null;
+        let currentFileName = null;
+        let pendingRowsMap = new Map();
+
+        function switchLanguage(lang) {
+            // Update tab active state
+            document.querySelectorAll('.language-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show/hide content
+            document.querySelectorAll('.info-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`info-${lang}`).classList.add('active');
+        }
+
+        function updateProgress() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            if (rows.length === 0) {
+                document.title = 'SRT Parser - Smart Auto-Scroll';
+                return;
+            }
+            
+            const percentage = Math.round((currentRowIndex / rows.length) * 100);
+            document.title = `${percentage}% - SRT Parser`;
+        }
+
+        function exportSRT() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            
+            if (rows.length === 0) {
+                alert('No subtitles to export');
+                return;
+            }
+            
+            showProcessingStatus('💾 Exporting SRT file...', 'Generating file content');
+            
+            let srtContent = '';
+            
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const number = cells[0].textContent;
+                const startTime = cells[1].textContent;
+                const endTime = cells[2].textContent;
+                // Only get text from column 3, ignore status column (4)
+                const text = cells[3].innerHTML
+                    .replace(/<br\s*\/?>/gi, '\n') // Convert <br> to newlines
+                    .replace(/<[^>]+>/g, '') // Remove any other HTML tags
+                    .trim();
+                
+                srtContent += `${number}\n`;
+                srtContent += `${startTime} --> ${endTime}\n`;
+                srtContent += `${text}\n\n`;
+                
+                // Update progress every 50 rows
+                if (i % 50 === 0 && i > 0) {
+                    const progress = Math.round((i / rows.length) * 100);
+                    updateProcessingStatus('💾 Exporting SRT file...', `Progress: ${progress}% (${i}/${rows.length})`);
+                }
+            }
+            
+            updateProcessingStatus('💾 Creating download...', 'Almost done');
+            
+            // Create and download file
+            const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = currentFileName ? currentFileName.replace('.srt', '_translated.srt') : 'subtitles_translated.srt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            console.log('✅ SRT file exported successfully');
+            updateProcessingStatus('✅ Export complete!', 'File downloaded successfully');
+            
+            // Hide status after 2 seconds
+            setTimeout(() => {
+                hideProcessingStatus();
+            }, 2000);
+        }
+
+        // Drag and drop handlers
+        const uploadBox = document.getElementById('uploadBox');
+        
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.srt')) {
+                handleFile(file);
+            } else {
+                showError('Please upload a .srt file');
+            }
+        });
+
+        function showProcessingStatus(title, details = '') {
+            const statusDiv = document.getElementById('processingStatus');
+            const titleSpan = document.getElementById('processingTitle');
+            const detailsSpan = document.getElementById('processingDetails');
+            
+            titleSpan.textContent = title;
+            detailsSpan.textContent = details;
+            statusDiv.classList.remove('hidden');
+        }
+
+        function hideProcessingStatus() {
+            const statusDiv = document.getElementById('processingStatus');
+            statusDiv.classList.add('hidden');
+        }
+
+        function updateProcessingStatus(title, details = '') {
+            const titleSpan = document.getElementById('processingTitle');
+            const detailsSpan = document.getElementById('processingDetails');
+            
+            if (titleSpan) titleSpan.textContent = title;
+            if (detailsSpan) detailsSpan.textContent = details;
+        }
+
+        function updateScrollMode() {
+            smartScrollMode = document.getElementById('smartScrollMode').checked;
+            
+            if (smartScrollMode) {
+                console.log('🧠 Smart scroll mode enabled - will detect changes');
+            } else {
+                console.log('⏱️ Manual scroll mode enabled - will use fixed delay');
+            }
+            
+            // If auto-scroll is active, restart with new mode
+            if (autoScrollActive) {
+                stopAutoScroll();
+                startAutoScroll();
+            }
+        }
+
+        function toggleAutoScroll() {
+            if (autoScrollActive) {
+                stopAutoScroll();
+            } else {
+                startAutoScroll();
+            }
+        }
+
+        function startAutoScroll() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            
+            if (rows.length === 0) {
+                alert('Please load an SRT file first');
+                return;
+            }
+
+            autoScrollActive = true;
+            currentRowIndex = 0;
+            
+            // Hide header completely and show floating stop button
+            document.getElementById('autoScrollSection').style.display = 'none';
+            document.querySelector('.header').classList.add('no-controls');
+            document.getElementById('floatingStopButton').classList.add('visible');
+
+            console.log(`\n${'='.repeat(60)}`);
+            console.log(`🚀 AUTO-SCROLL STARTED - Mode: ${smartScrollMode ? 'SMART 🧠' : 'MANUAL ⏱️'}`);
+            console.log(`${'='.repeat(60)}\n`);
+
+            if (smartScrollMode) {
+                // Insert ((pending)) markers in ALL rows
+                insertPendingMarkers();
+                // Setup mutation observer for smart detection
+                setupMutationObserver();
+                // Start by finding first untranslated row
+                scrollToNextUntranslated();
+            } else {
+                // Manual mode: just start scrolling with fixed delay
+                scrollToNextRow();
+            }
+            
+            updateProgress();
+        }
+
+        function stopAutoScroll() {
+            autoScrollActive = false;
+            
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+            
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+                mutationObserver = null;
+            }
+            
+            // Show header and hide floating button
+            document.getElementById('autoScrollSection').style.display = '';
+            document.querySelector('.header').classList.remove('no-controls');
+            document.getElementById('floatingStopButton').classList.remove('visible');
+            
+            // Update button UI
+            const button = document.getElementById('toggleAutoScroll');
+            button.classList.remove('active');
+            document.getElementById('scrollIcon').textContent = '▶️';
+            document.getElementById('scrollButtonText').textContent = 'Start';
+            const scrollStatus = document.getElementById('scrollStatus');
+            if (scrollStatus) {
+                scrollStatus.textContent = 'Inactive';
+            }
+            
+            console.log('\n⏹️ AUTO-SCROLL STOPPED\n');
+            
+            // Reset title
+            document.title = 'SRT Parser - Smart Auto-Scroll';
+        }
+
+        function insertPendingMarkers() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            pendingRowsMap.clear();
+            
+            console.log('📝 Inserting ((waiting ready)) markers in status column...');
+            showProcessingStatus('📝 Preparing subtitles...', 'Inserting status markers');
+            
+            for (let i = 0; i < rows.length; i++) {
+                const statusCell = rows[i].cells[4];
+                if (statusCell) {
+                    statusCell.innerHTML = '<span class="status-waiting">((waiting ready))</span>';
+                    pendingRowsMap.set(i, true);
+                }
+                
+                // Update progress every 50 rows
+                if (i % 50 === 0 && i > 0) {
+                    const progress = Math.round((i / rows.length) * 100);
+                    updateProcessingStatus('📝 Preparing subtitles...', `Progress: ${progress}% (${i}/${rows.length})`);
+                }
+            }
+            
+            console.log(`✅ Markers inserted in ${pendingRowsMap.size} subtitles`);
+            updateProcessingStatus('✅ Ready to translate!', `${pendingRowsMap.size} subtitles marked as waiting`);
+            
+            // Hide status after 1.5 seconds
+            setTimeout(() => {
+                hideProcessingStatus();
+            }, 1500);
+        }
+
+        function setupMutationObserver() {
+            const tableBody = document.getElementById('tableBody');
+            
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+            }
+            
+            mutationObserver = new MutationObserver((mutations) => {
+                if (!autoScrollActive || !smartScrollMode) return;
+                
+                for (const mutation of mutations) {
+                    if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                        // Safely get the target row
+                        let targetRow = null;
+                        
+                        if (mutation.target.nodeType === Node.ELEMENT_NODE) {
+                            targetRow = mutation.target.closest('tr');
+                        } else if (mutation.target.parentNode) {
+                            targetRow = mutation.target.parentNode.closest ? 
+                                       mutation.target.parentNode.closest('tr') : 
+                                       mutation.target.parentNode.parentElement?.closest('tr');
+                        }
+                        
+                        if (!targetRow) continue;
+                        
+                        const rows = Array.from(tableBody.getElementsByTagName('tr'));
+                        const rowIndex = rows.indexOf(targetRow);
+                        
+                        // Check if this is the current row we're monitoring
+                        if (rowIndex === currentRowIndex) {
+                            const textCell = targetRow.cells[3];
+                            const statusCell = targetRow.cells[4];
+                            
+                            if (textCell && statusCell) {
+                                const cellText = textCell.textContent;
+                                const statusText = statusCell.textContent;
+                                
+                                // Check if the text cell was edited (translation happened)
+                                // and status still shows waiting
+                                if (statusText.includes('((waiting ready))')) {
+                                    // Assume translation happened if text changed
+                                    // Change status to ready
+                                    console.log(`\n🔍 CHANGE DETECTED in row #${rowIndex + 1}`);
+                                    console.log(`   ✅ Text translated - updating status to READY`);
+                                    
+                                    statusCell.innerHTML = '<span class="status-ready">✓ READY</span>';
+                                    
+                                    // Mark as processed
+                                    pendingRowsMap.delete(rowIndex);
+                                    
+                                    // Update scroll status
+                                    const scrollStatusDiv = document.getElementById('scrollStatus');
+                                    if (scrollStatusDiv) {
+                                        scrollStatusDiv.textContent = `Detecting... (#${rowIndex + 1})`;
+                                        scrollStatusDiv.classList.add('detecting');
+                                    }
+                                    
+                                    // Move to next untranslated row immediately
+                                    setTimeout(() => {
+                                        if (scrollStatusDiv) {
+                                            scrollStatusDiv.classList.remove('detecting');
+                                            scrollStatusDiv.textContent = 'Active';
+                                        }
+                                        scrollToNextUntranslated();
+                                    }, 100);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Observe the entire table body for changes
+            mutationObserver.observe(tableBody, {
+                childList: true,
+                subtree: true,
+                characterData: true,
+                characterDataOldValue: true
+            });
+            
+            console.log('👁️ MutationObserver configured - monitoring changes...');
+        }
+
+        function scrollToNextUntranslated() {
+            if (!autoScrollActive) return;
+            
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            
+            // Start searching from current position
+            let foundIndex = -1;
+            
+            for (let i = currentRowIndex; i < rows.length; i++) {
+                const statusCell = rows[i].cells[4];
+                if (statusCell && statusCell.textContent.includes('((waiting ready))')) {
+                    foundIndex = i;
+                    break;
+                }
+            }
+            
+            if (foundIndex === -1) {
+                // No more untranslated rows found
+                console.log('\n🏁 END OF DOCUMENT - All rows translated');
+                console.log('💾 Exporting translated file...');
+                exportSRT();
+                stopAutoScroll();
+                return;
+            }
+            
+            // Silently move to the untranslated row
+            currentRowIndex = foundIndex;
+            
+            console.log(`\n⏩ Jumping to next untranslated row #${foundIndex + 1}`);
+            
+            // Now scroll to and highlight it
+            scrollToRow(foundIndex);
+        }
+
+        function scrollToRow(index) {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            
+            if (index >= rows.length) {
+                console.log('\n🏁 END OF DOCUMENT - Auto-scroll completed');
+                console.log('💾 Exporting translated file...');
+                
+                // Auto-export at the end
+                exportSRT();
+                
+                stopAutoScroll();
+                return;
+            }
+            
+            // Update current index
+            currentRowIndex = index;
+            
+            // Remove highlight from all rows
+            Array.from(rows).forEach(row => row.classList.remove('highlight'));
+            
+            // Highlight current row
+            const currentRow = rows[index];
+            currentRow.classList.add('highlight');
+            
+            // Scroll into view
+            currentRow.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            
+            const textCell = currentRow.cells[3];
+            const statusCell = currentRow.cells[4];
+            const cellText = textCell ? textCell.textContent : '';
+            const statusText = statusCell ? statusCell.textContent : '';
+            
+            // Update progress
+            updateProgress();
+            
+            console.log(`\n📍 Row #${index + 1} of ${rows.length}`);
+            console.log(`   Text: ${cellText.substring(0, 60)}...`);
+            console.log(`   Status: ${statusText}`);
+            
+            if (smartScrollMode) {
+                if (statusText.includes('((waiting ready))')) {
+                    console.log(`   ⏳ Waiting for translation...`);
+                    // Will wait for mutation observer to detect change
+                } else {
+                    console.log(`   ⚠️ Already translated - this shouldn't happen in smart mode`);
+                    // This row is already translated, move to next untranslated
+                    setTimeout(() => scrollToNextUntranslated(), 200);
+                }
+            }
+        }
+
+        function scrollToNextRow() {
+            if (!autoScrollActive) return;
+            
+            currentRowIndex++;
+            
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            
+            if (currentRowIndex >= rows.length) {
+                console.log('\n🏁 END OF DOCUMENT - Auto-scroll completed');
+                console.log('💾 Exporting translated file...');
+                
+                // Auto-export at the end
+                exportSRT();
+                
+                stopAutoScroll();
+                return;
+            }
+            
+            if (smartScrollMode) {
+                // In smart mode, just scroll to the row and wait for changes
+                scrollToRow(currentRowIndex);
+            } else {
+                // In manual mode, use fixed delay
+                const delay = parseFloat(document.getElementById('scrollDelay').value) * 1000;
+                scrollToRow(currentRowIndex);
+                
+                autoScrollInterval = setTimeout(() => {
+                    scrollToNextRow();
+                }, delay);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file) return;
+
+            // Clear previous content
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            
+            // Show detailed loading status
+            showProcessingStatus('📂 Loading SRT file...', `Reading "${file.name}"`);
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    updateProcessingStatus('🔍 Parsing subtitles...', 'Analyzing SRT format');
+                    
+                    const content = e.target.result;
+                    const subtitles = parseSRT(content);
+                    
+                    updateProcessingStatus('✅ Parsing complete', `Found ${subtitles.length} subtitles`);
+                    
+                    // Store original subtitles
+                    currentSubtitles = subtitles;
+                    currentFileName = file.name;
+                    
+                    // Check if YouTube improvement is enabled
+                    const improveYT = document.getElementById('improveYouTubeSubs').checked;
+                    if (improveYT) {
+                        subtitles = improveYouTubeSubtitles(subtitles);
+                        currentSubtitles = subtitles;
+                    }
+                    
+                    displaySubtitles(subtitles, file.name);
+                    document.getElementById('loading').classList.add('hidden');
+                    
+                    if (!improveYT) {
+                        hideProcessingStatus();
+                    }
+                } catch (error) {
+                    document.getElementById('loading').classList.add('hidden');
+                    hideProcessingStatus();
+                    showError('Error processing file: ' + error.message);
+                }
+            };
+
+            reader.onerror = function() {
+                document.getElementById('loading').classList.add('hidden');
+                hideProcessingStatus();
+                showError('Error reading file');
+            };
+
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseSRT(content) {
+            const subtitles = [];
+            const blocks = content.trim().split(/\n\s*\n/);
+            
+            blocks.forEach(block => {
+                const lines = block.trim().split('\n');
+                
+                if (lines.length >= 3) {
+                    const number = lines[0].trim();
+                    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+                    
+                    if (timeMatch) {
+                        const startTime = timeMatch[1];
+                        const endTime = timeMatch[2];
+                        const text = lines.slice(2).join('\n').trim();
+                        
+                        subtitles.push({
+                            number: number,
+                            startTime: startTime,
+                            endTime: endTime,
+                            text: text,
+                            originalText: text
+                        });
+                    }
+                }
+            });
+            
+            return subtitles;
+        }
+
+        function improveYouTubeSubtitles(subtitles) {
+            if (!subtitles || subtitles.length === 0) return subtitles;
+            
+            console.log('🎬 Starting YouTube subtitle improvement...');
+            console.log(`   Processing ${subtitles.length} subtitles...`);
+            showProcessingStatus('🎬 Improving YouTube subtitles...', `Processing ${subtitles.length} entries`);
+            
+            const improved = [];
+            const processedLines = new Set();
+            let processedCount = 0;
+            
+            for (let i = 0; i < subtitles.length; i++) {
+                const current = subtitles[i];
+                const lines = current.text.split('\n').map(line => line.trim());
+                
+                // Update progress every 10 subtitles
+                if (i % 10 === 0) {
+                    const progress = Math.round((i / subtitles.length) * 100);
+                    updateProcessingStatus('🎬 Improving YouTube subtitles...', `Progress: ${progress}% (${i}/${subtitles.length})`);
+                }
+                
+                for (const line of lines) {
+                    if (!line || line === '' || processedLines.has(line) || line.match(/^\[.*\]$/)) {
+                        continue;
+                    }
+                    
+                    let firstOccurrence = i;
+                    let lastOccurrence = i;
+                    
+                    for (let j = i + 1; j < subtitles.length; j++) {
+                        const nextLines = subtitles[j].text.split('\n').map(l => l.trim()).filter(l => l && l !== '');
+                        const hasCurrentLine = nextLines.includes(line);
+                        
+                        if (hasCurrentLine) {
+                            const hasNewLine = nextLines.some(nextLine => 
+                                nextLine !== line && 
+                                !processedLines.has(nextLine) && 
+                                !nextLine.match(/^\[.*\]$/)
+                            );
+                            
+                            if (hasNewLine) {
+                                break;
+                            } else {
+                                lastOccurrence = j;
+                            }
+                        }
+                    }
+                    
+                    processedLines.add(line);
+                    
+                    const entry = {
+                        number: improved.length + 1,
+                        startTime: subtitles[firstOccurrence].startTime,
+                        endTime: subtitles[lastOccurrence].endTime,
+                        text: line + '\n ',
+                        originalText: current.originalText
+                    };
+                    
+                    improved.push(entry);
+                    processedCount++;
+                    console.log(`   ✅ Entry #${entry.number}: "${line}" (subs #${firstOccurrence + 1}-#${lastOccurrence + 1})`);
+                }
+            }
+            
+            console.log(`\n✅ Improvement complete! Reduced from ${subtitles.length} to ${improved.length} subtitles`);
+            updateProcessingStatus('✅ YouTube improvement complete!', `Reduced from ${subtitles.length} to ${improved.length} subtitles`);
+            
+            // Hide status after 2 seconds
+            setTimeout(() => {
+                hideProcessingStatus();
+            }, 2000);
+            
+            return improved;
+        }
+
+        function reprocessSubtitles() {
+            if (!currentSubtitles || !currentFileName) return;
+            
+            showProcessingStatus('🔄 Reprocessing subtitles...', 'Please wait...');
+            
+            setTimeout(() => {
+                let processedSubs = currentSubtitles.map(sub => ({
+                    ...sub,
+                    text: sub.originalText
+                }));
+                
+                const improveYT = document.getElementById('improveYouTubeSubs').checked;
+                if (improveYT) {
+                    processedSubs = improveYouTubeSubtitles(processedSubs);
+                } else {
+                    console.log('📄 Displaying original subtitles without improvement');
+                    updateProcessingStatus('📄 Loading original subtitles...', 'No improvements applied');
+                    setTimeout(() => {
+                        hideProcessingStatus();
+                    }, 1000);
+                }
+                
+                currentSubtitles = processedSubs;
+                displaySubtitles(processedSubs, currentFileName);
+            }, 100);
+        }
+
+        function displaySubtitles(subtitles, fileName) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (subtitles.length === 0) {
+                showError('No subtitles found in file');
+                return;
+            }
+
+            subtitles.forEach(sub => {
+                const row = tbody.insertRow();
+                
+                const cellNumber = row.insertCell(0);
+                const cellStart = row.insertCell(1);
+                const cellEnd = row.insertCell(2);
+                const cellText = row.insertCell(3);
+                const cellStatus = row.insertCell(4);
+                
+                cellNumber.textContent = sub.number;
+                cellStart.textContent = sub.startTime;
+                cellEnd.textContent = sub.endTime;
+                cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
+                
+                // Status column is empty initially
+                cellStatus.innerHTML = '';
+                cellStatus.className = 'cell-status';
+            });
+
+            document.getElementById('totalSubs').textContent = subtitles.length.toLocaleString();
+            document.getElementById('fileName').textContent = fileName;
+            
+            if (subtitles.length > 0) {
+                const lastTime = subtitles[subtitles.length - 1].endTime;
+                document.getElementById('duration').textContent = lastTime.split(',')[0];
+            }
+
+            document.getElementById('infoSection').classList.add('hidden');
+            document.getElementById('tableContainer').classList.remove('hidden');
+            document.getElementById('stats').classList.remove('hidden');
+            
+            // Enable export button
+            document.getElementById('exportButton').disabled = false;
+            
+            // Auto-scroll to first subtitle after a short delay
+            setTimeout(() => {
+                const firstRow = tbody.getElementsByTagName('tr')[0];
+                if (firstRow) {
+                    firstRow.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                    console.log('📍 Scrolled to first subtitle');
+                }
+            }, 300);
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = '❌ ' + message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+            }
+        });
+    </script>
+</body>
+</html>
