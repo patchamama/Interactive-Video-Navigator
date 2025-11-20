@@ -2232,6 +2232,7 @@
                 // German
                 'weil', 'wenn', 'dass', 'ob', 'als', 'damit', 'obwohl', 'bevor', 'nachdem',
                 'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'ok', 'okay',
+                'auch', 'deswegen', 'also', 'wie', 'was', 'dann',
                 // Spanish
                 'que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
                 'para que', 'ya que', 'pero', 'sino', 'o', 'y', 'ok', 'okey',
@@ -2671,11 +2672,37 @@
 
             const MAX_LENGTH = parseInt(document.getElementById('maxSubtitleLength').value) || 200;
 
+            // Count total longlines in document
+            let totalLonglines = 0;
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const text = cells[3].innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+                if (text.length > MAX_LENGTH) {
+                    totalLonglines++;
+                }
+            }
+
+            // Show toast message with count
+            if (totalLonglines > 0) {
+                showProcessingStatus(
+                    `📏 ${totalLonglines} longline${totalLonglines > 1 ? 's' : ''} found`,
+                    `Lines exceeding ${MAX_LENGTH} characters`
+                );
+                setTimeout(() => hideProcessingStatus(), 2500);
+            } else {
+                showProcessingStatus(
+                    `✅ No longlines found`,
+                    `All lines are within ${MAX_LENGTH} characters`
+                );
+                setTimeout(() => hideProcessingStatus(), 2500);
+            }
+
             // Start searching from position after last found
             const startIndex = lastLonglineSearchIndex + 1;
             let foundIndex = -1;
 
             console.log(`\n📏 Searching for longlines (>${MAX_LENGTH} chars) from row ${startIndex + 1}...`);
+            console.log(`  Total longlines in document: ${totalLonglines}`);
 
             // Search from current position to end
             for (let i = startIndex; i < rows.length; i++) {
