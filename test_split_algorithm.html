@@ -158,13 +158,18 @@
             console.log('-'.repeat(80));
 
             const subordinateWords = [
-                'weil', 'wenn', 'dass', 'ob', 'als', 'damit', 'obwohl', 'bevor', 'nachdem',
+                // German (removed: was, die, das, als, den - these will be checked with comma prefix)
+                'weil', 'wenn', 'dass', 'ob', 'damit', 'obwohl', 'bevor', 'nachdem',
                 'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'ok', 'okay',
-                'auch', 'deswegen', 'also', 'wie', 'was', 'dann', 'das', 'die', 'den', 'wo',
+                'auch', 'deswegen', 'also', 'wie', 'dann', 'wo',
                 'que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
                 'para que', 'ya que', 'pero', 'sino', 'o', 'y', 'ok', 'okey',
                 'that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
                 'since', 'unless', 'until', 'but', 'or', 'and', 'yet', 'ok', 'okay', 'okey'
+            ];
+
+            const commaRequiredWords = [
+                'was', 'die', 'das', 'als', 'den'
             ];
 
             const personalPronouns = [
@@ -225,6 +230,21 @@
                     }
                 }
 
+                // Strategy 2.5A: Comma + comma-required word backward
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                        if (remainingText[j] === ',') {
+                            const afterComma = remainingText.substring(j + 1).trimStart();
+                            const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                            if (commaRequiredWords.includes(wordAfterComma)) {
+                                splitPoint = j + 1;
+                                strategy = `comma + word "${wordAfterComma}" (backward)`;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 // FORWARD SEARCH
                 if (splitPoint === -1) {
                     console.log(`  No split point found backward, searching FORWARD...`);
@@ -271,6 +291,21 @@
                         }
                     }
 
+                    // Strategy 2.25B: Comma + comma-required word forward (limited range)
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ',') {
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (commaRequiredWords.includes(wordAfterComma)) {
+                                    splitPoint = j + 1;
+                                    strategy = `comma + word "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     // Strategy 2.5B: Any comma forward
                     if (splitPoint === -1) {
                         for (let j = maxLength; j < remainingText.length; j++) {
@@ -294,10 +329,22 @@
                     }
                 }
 
-                // Strategy 4: Force split
+                // Strategy 4: Search BACKWARDS for any space (to avoid splitting mid-word)
                 if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= 0; j--) {
+                        if (remainingText[j] === ' ') {
+                            splitPoint = j + 1;
+                            strategy = 'any space (backward from MAX_LENGTH)';
+                            break;
+                        }
+                    }
+                }
+
+                // Strategy 5: Absolute last resort - force split
+                if (splitPoint === -1) {
+                    console.warn(`⚠️ WARNING: No spaces found! Forcing split at MAX_LENGTH`);
                     splitPoint = maxLength;
-                    strategy = 'force at MAX_LENGTH';
+                    strategy = 'force at MAX_LENGTH (NO SPACES FOUND)';
                 }
 
                 const chunk = remainingText.substring(0, splitPoint).trim();
