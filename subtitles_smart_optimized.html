@@ -650,7 +650,7 @@
     <div class="container">
         <!-- Fixed Auto-Scroll Control Section -->
         <div class="auto-scroll-section" id="autoScrollSection">
-            <span class="version-badge">v3.0 Optimized</span>
+            <span class="version-badge">v3.1 Ultra-Fast</span>
             <div class="controls-row">
                 <div class="auto-scroll-controls">
                     <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
@@ -815,6 +815,7 @@
                         <th class="cell-time">Start</th>
                         <th class="cell-time">End</th>
                         <th class="cell-text">Text</th>
+                        <th class="cell-text" style="display: none;">Hidden Test</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -890,16 +891,19 @@
             const tableBody = document.getElementById('tableBody');
             const rows = tableBody.getElementsByTagName('tr');
             virtualDOM = [];
-            
+
             for (let i = 0; i < rows.length; i++) {
                 const textCell = rows[i].cells[3];
+                const hiddenCell = rows[i].cells[4]; // Hidden test column
                 virtualDOM.push({
                     index: i,
                     text: textCell ? textCell.textContent : '',
-                    translated: false
+                    hiddenText: hiddenCell ? hiddenCell.textContent : '',
+                    translated: false,
+                    hiddenTranslated: false
                 });
             }
-            
+
             console.log(`📸 Virtual DOM created with ${virtualDOM.length} rows`);
             return virtualDOM;
         }
@@ -907,53 +911,82 @@
         // Check for changes starting from lastCheckedIndex
         function checkForChanges() {
             if (!autoScrollActive) return;
-            
+
             const tableBody = document.getElementById('tableBody');
             const rows = tableBody.getElementsByTagName('tr');
-            
-            let changeDetected = false;
-            
-            // Check from lastCheckedIndex onwards
+
+            let lastChangedRow = -1;
+
+            // Continue checking from lastCheckedIndex until we find an unchanged row
             for (let i = lastCheckedIndex; i < rows.length; i++) {
                 const textCell = rows[i].cells[3];
+                const hiddenCell = rows[i].cells[4];
                 if (!textCell) continue;
-                
+
                 const currentText = textCell.textContent;
                 const virtualText = virtualDOM[i] ? virtualDOM[i].text : '';
-                
-                // Detect change
+
+                const currentHiddenText = hiddenCell ? hiddenCell.textContent : '';
+                const virtualHiddenText = virtualDOM[i] ? virtualDOM[i].hiddenText : '';
+
+                // Check hidden column for changes (for testing translator behavior)
+                if (currentHiddenText !== virtualHiddenText && !virtualDOM[i].hiddenTranslated) {
+                    console.log(`\n🔬 HIDDEN COLUMN MODIFIED at row #${i + 1}`);
+                    console.log(`   Original hidden text: "${virtualHiddenText}"`);
+                    console.log(`   Modified hidden text: "${currentHiddenText}"`);
+                    console.log(`   ⚠️ Translator is modifying the hidden test column!`);
+
+                    virtualDOM[i].hiddenText = currentHiddenText;
+                    virtualDOM[i].hiddenTranslated = true;
+                }
+
+                // Detect change in main text
                 if (currentText !== virtualText && !virtualDOM[i].translated) {
                     console.log(`\n🔍 CHANGE DETECTED at row #${i + 1}`);
                     console.log(`   Original: "${virtualText.substring(0, 50)}..."`);
                     console.log(`   Translated: "${currentText.substring(0, 50)}..."`);
-                    
+
                     // Update virtual DOM
                     virtualDOM[i].text = currentText;
                     virtualDOM[i].translated = true;
-                    
-                    // Move to this row
-                    lastCheckedIndex = i + 1;
-                    scrollToRow(i);
-                    
-                    changeDetected = true;
-                    
-                    // Reset no-change timeout
-                    if (noChangeTimeout) {
-                        clearTimeout(noChangeTimeout);
+
+                    // Track this as the last changed row
+                    lastChangedRow = i;
+
+                    // Continue to next row without breaking
+                    continue;
+                }
+
+                // Found a row that hasn't changed - this is our stopping point
+                if (currentText === virtualText) {
+                    if (lastChangedRow >= 0) {
+                        // We found changed rows, now show the last one
+                        console.log(`\n📍 Found unchanged row at #${i + 1}, stopping at last changed row #${lastChangedRow + 1}`);
+
+                        // Move to the last changed row
+                        lastCheckedIndex = lastChangedRow + 1;
+                        scrollToRow(lastChangedRow);
+
+                        // Reset no-change timeout
+                        if (noChangeTimeout) {
+                            clearTimeout(noChangeTimeout);
+                        }
+                        startNoChangeTimeout();
+
+                        // Update status
+                        updateProcessingStatus('🔄 Translation detected', `Row #${lastChangedRow + 1} translated - Continuing...`);
+                        updateProgress();
+
+                        return; // Exit and wait for next check
+                    } else {
+                        // No changes found yet, continue checking
+                        break;
                     }
-                    startNoChangeTimeout();
-                    
-                    // Update status
-                    updateProcessingStatus('🔄 Translation detected', `Row #${i + 1} translated - Moving to next...`);
-                    updateProgress();
-                    
-                    // Only process one change at a time
-                    break;
                 }
             }
-            
-            if (!changeDetected && lastCheckedIndex >= rows.length) {
-                // Reached the end
+
+            // Reached the end of the document
+            if (lastCheckedIndex >= rows.length) {
                 console.log('\n🏁 END OF DOCUMENT - All rows checked');
                 console.log('💾 Exporting translated file...');
                 stopDOMComparison();
@@ -1004,34 +1037,44 @@
             // Create initial snapshot
             createVirtualDOM();
             lastCheckedIndex = 0;
-            
+
             console.log('🚀 Starting DOM comparison...');
-            console.log(`   Checking every 100ms`);
+            console.log(`   Continuous execution mode (no delay)`);
             console.log(`   Starting from row #${lastCheckedIndex + 1}`);
-            
+            console.log(`   Hidden test column: "((Waiting, Espera, Warten))"`);
+
             // Show status
             showProcessingStatus('🔄 Smart scroll active', `Monitoring row #${lastCheckedIndex + 1} - Waiting for translation...`);
-            
-            // Start checking every 100ms
-            comparisonInterval = setInterval(() => {
+
+            // Start continuous checking loop
+            function continuousCheck() {
+                if (!autoScrollActive) return;
+
                 checkForChanges();
-            }, 100);
-            
+
+                // Immediately schedule next check (no delay)
+                comparisonInterval = setTimeout(() => {
+                    continuousCheck();
+                }, 0); // 0ms = execute as soon as possible
+            }
+
+            continuousCheck();
+
             // Start no-change timeout
             startNoChangeTimeout();
         }
 
         function stopDOMComparison() {
             if (comparisonInterval) {
-                clearInterval(comparisonInterval);
+                clearTimeout(comparisonInterval); // Changed from clearInterval
                 comparisonInterval = null;
             }
-            
+
             if (noChangeTimeout) {
                 clearTimeout(noChangeTimeout);
                 noChangeTimeout = null;
             }
-            
+
             console.log('⏹️ DOM comparison stopped');
         }
 
@@ -1350,16 +1393,21 @@
 
             subtitles.forEach(sub => {
                 const row = tbody.insertRow();
-                
+
                 const cellNumber = row.insertCell(0);
                 const cellStart = row.insertCell(1);
                 const cellEnd = row.insertCell(2);
                 const cellText = row.insertCell(3);
-                
+                const cellHidden = row.insertCell(4); // Hidden test column
+
                 cellNumber.textContent = sub.number;
                 cellStart.textContent = sub.startTime;
                 cellEnd.textContent = sub.endTime;
                 cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
+
+                // Add hidden test text - this should NOT be translated
+                cellHidden.textContent = '((Waiting, Espera, Warten))';
+                cellHidden.style.display = 'none';
             });
 
             document.getElementById('totalSubs').textContent = subtitles.length.toLocaleString();
