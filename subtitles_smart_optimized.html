@@ -633,13 +633,13 @@
         }
 
         /* Edit Mode styles */
-        .edit-mode-active .cell-text {
-            cursor: crosshair;
+        .edit-mode-active tbody td:nth-child(4) {
+            cursor: crosshair !important;
             position: relative;
         }
 
-        .edit-mode-active .cell-text:hover {
-            background-color: #f0f0f0;
+        .edit-mode-active tbody td:nth-child(4):hover {
+            background-color: #f0f0f0 !important;
             transition: background-color 0.2s;
         }
 
@@ -2991,20 +2991,104 @@
 
             if (fullText.length === 0) return;
 
-            // Calculate click position in text
-            const textRect = textCell.getBoundingClientRect();
-            const clickX = event.clientX - textRect.left;
-            const textWidth = textRect.width;
-            const clickRatio = clickX / textWidth;
-            const splitPosition = Math.max(1, Math.min(fullText.length - 1, Math.round(fullText.length * clickRatio)));
+            // Store original HTML
+            const originalHTML = textCell.innerHTML;
+
+            // Temporarily set cell to plain text for accurate position detection
+            textCell.textContent = fullText;
+
+            // Get precise click position using browser API
+            let splitPosition = getClickPositionInText(event.clientX, event.clientY, textCell, fullText);
+
+            // Restore original HTML
+            textCell.innerHTML = originalHTML;
+
+            // Validate split position
+            splitPosition = Math.max(1, Math.min(fullText.length - 1, splitPosition));
 
             console.log(`\n✏️ Edit mode click detected:`);
             console.log(`  Row: ${row.rowIndex}`);
             console.log(`  Text length: ${fullText.length}`);
             console.log(`  Split position: ${splitPosition}`);
+            console.log(`  Click coordinates: (${event.clientX}, ${event.clientY})`);
 
             // Show visual preview
             showSplitPreview(row, fullText, splitPosition);
+        }
+
+        /**
+         * Get precise character position from click coordinates
+         * Uses browser APIs for accurate text position detection
+         */
+        function getClickPositionInText(clientX, clientY, element, fullText) {
+            let position = 0;
+
+            // Try caretRangeFromPoint (Chrome, Safari, Edge)
+            if (document.caretRangeFromPoint) {
+                const range = document.caretRangeFromPoint(clientX, clientY);
+                if (range) {
+                    position = range.startOffset;
+                    console.log(`  Using caretRangeFromPoint: offset=${position}`);
+                    return position;
+                }
+            }
+
+            // Try caretPositionFromPoint (Firefox)
+            if (document.caretPositionFromPoint) {
+                const caretPosition = document.caretPositionFromPoint(clientX, clientY);
+                if (caretPosition && caretPosition.offsetNode) {
+                    position = caretPosition.offset;
+                    console.log(`  Using caretPositionFromPoint: offset=${position}`);
+                    return position;
+                }
+            }
+
+            // Fallback: Use binary search with Range API
+            console.log(`  Using binary search fallback`);
+            const range = document.createRange();
+            const textNode = element.firstChild;
+
+            if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+                // Fallback to proportional calculation if no text node
+                const rect = element.getBoundingClientRect();
+                const clickX = clientX - rect.left;
+                const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                return Math.round(fullText.length * ratio);
+            }
+
+            let left = 0;
+            let right = fullText.length;
+            let bestPosition = 0;
+            let minDistance = Infinity;
+
+            // Binary search for closest character position
+            while (left <= right) {
+                const mid = Math.floor((left + right) / 2);
+
+                try {
+                    range.setStart(textNode, mid);
+                    range.setEnd(textNode, mid);
+                    const rect = range.getBoundingClientRect();
+                    const charX = rect.left;
+
+                    const distance = Math.abs(charX - clientX);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestPosition = mid;
+                    }
+
+                    if (charX < clientX) {
+                        left = mid + 1;
+                    } else {
+                        right = mid - 1;
+                    }
+                } catch (e) {
+                    // If range fails, use proportional fallback
+                    break;
+                }
+            }
+
+            return bestPosition;
         }
 
         /**
