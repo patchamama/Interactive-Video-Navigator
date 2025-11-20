@@ -3191,11 +3191,14 @@
                 overlay.remove();
             }
 
-            // Execute the split
-            splitSubtitleAtPosition(row, fullText, splitPosition);
+            // Clean up preview visuals BEFORE executing split
+            row.classList.remove('split-preview-row');
 
-            // Clean up preview
-            cleanupSplitPreview();
+            // Clear currentSplitPreview to prevent cleanup from restoring text
+            currentSplitPreview = null;
+
+            // Execute the split (this will update the cell text correctly)
+            splitSubtitleAtPosition(row, fullText, splitPosition);
         }
 
         /**
