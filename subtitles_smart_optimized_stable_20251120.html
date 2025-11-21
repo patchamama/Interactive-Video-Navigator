@@ -1,0 +1,3672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRT Parser - Smart Auto-Scroll</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .auto-scroll-section {
+            padding: 10px 20px;
+            background: #e8f5e9;
+            border-bottom: 2px solid #4caf50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .auto-scroll-section.compact {
+            padding: 15px 20px;
+            background: #4caf50;
+            display: none;
+        }
+
+        .floating-stop-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: none;
+            padding: 15px 30px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+            transition: all 0.3s;
+        }
+
+        .floating-stop-button:hover {
+            background: #da190b;
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.6);
+        }
+
+        .floating-stop-button.visible {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .version-badge {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            font-size: 0.75em;
+            color: #2e7d32;
+            background: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 2px solid #4caf50;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .controls-line {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            margin-top: 80px;
+            transition: margin-top 0.3s;
+        }
+
+        .header.no-controls {
+            margin-top: 0;
+        }
+
+        .auto-scroll-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .scroll-button {
+            padding: 12px 24px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 120px;
+            white-space: nowrap;
+        }
+
+        .scroll-button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .scroll-button.active {
+            background: #f44336;
+        }
+
+        .scroll-button.active:hover {
+            background: #da190b;
+        }
+
+        .toggle-button {
+            padding: 10px 20px;
+            background: #e0e0e0;
+            color: #333;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 140px;
+            white-space: nowrap;
+        }
+
+        .toggle-button:hover {
+            background: #d0d0d0;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-button.active {
+            background: #4caf50;
+            color: white;
+            border-color: #4caf50;
+        }
+
+        .toggle-button.active:hover {
+            background: #45a049;
+            border-color: #45a049;
+        }
+
+        .delay-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .delay-control label {
+            font-weight: 600;
+            color: #2e7d32;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .delay-control input {
+            width: 70px;
+            padding: 8px;
+            border: 2px solid #4caf50;
+            border-radius: 6px;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .delay-control select {
+            padding: 8px;
+            border: 2px solid #4caf50;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .delay-control span {
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .scroll-status {
+            padding: 8px 16px;
+            background: white;
+            border-radius: 6px;
+            font-weight: 600;
+            color: #2e7d32;
+            border: 2px solid #4caf50;
+            font-size: 0.9em;
+        }
+
+        .scroll-status.detecting {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .stop-button-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .export-button {
+            padding: 10px 20px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 160px;
+            white-space: nowrap;
+        }
+
+        .export-button:hover {
+            background: #1976d2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+        }
+
+        .export-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .processing-status {
+            padding: 20px 40px;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
+            border-left: 5px solid #ffc107;
+            margin: 0;
+            text-align: center;
+            font-weight: 600;
+            color: #856404;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001;
+            border-radius: 8px;
+            min-width: 400px;
+            max-width: 600px;
+        }
+
+        .processing-status.visible {
+            display: flex;
+        }
+
+        .processing-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .processing-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ffc107;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        .processing-title {
+            font-size: 1.3em;
+            color: #f57c00;
+            font-weight: 700;
+        }
+
+        .processing-details {
+            font-size: 0.95em;
+            color: #856404;
+            opacity: 0.9;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .checkbox-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-control input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #4caf50;
+        }
+
+        .checkbox-control label {
+            font-weight: 600;
+            color: #2e7d32;
+            font-size: 0.9em;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .upload-box {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 60px 40px;
+            background: white;
+            transition: all 0.3s;
+            cursor: pointer;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .upload-box:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+        }
+
+        .upload-box.dragover {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .upload-box h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+        }
+
+        .upload-box p {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 25px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.1em;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .file-label:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .info-section {
+            padding: 30px 40px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            border-left: 5px solid #667eea;
+            margin: 0;
+        }
+
+        .info-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .language-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .language-tab {
+            padding: 10px 25px;
+            background: white;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            font-size: 1em;
+        }
+
+        .language-tab:hover {
+            background: #f0f0f0;
+        }
+
+        .language-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .info-content {
+            display: none;
+        }
+
+        .info-content.active {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            text-align: left;
+        }
+
+        .info-language {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-language h3 {
+            color: #764ba2;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-language ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-language li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-language li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-icon {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .table-container {
+            padding: 40px;
+            overflow-x: auto;
+        }
+
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px 40px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .subtitle-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .subtitle-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .subtitle-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .subtitle-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .subtitle-table tbody tr {
+            transition: background-color 0.2s;
+        }
+
+        .subtitle-table tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+
+        .subtitle-table tbody tr.highlight {
+            background-color: #fff3cd;
+            animation: highlight-fade 2s ease-out;
+        }
+
+        .subtitle-table tbody tr.losstime-highlight {
+            background-color: #ffcccc;
+            animation: losstime-highlight-fade 2s ease-out;
+            border: 2px solid #ff5555;
+        }
+
+        .subtitle-table tbody tr.longline-highlight {
+            background-color: #e1bee7;
+            animation: longline-highlight-fade 2s ease-out;
+            border: 2px solid #9c27b0;
+        }
+
+        @keyframes highlight-fade {
+            0% { background-color: #ffc107; }
+            100% { background-color: #fff3cd; }
+        }
+
+        @keyframes losstime-highlight-fade {
+            0% { background-color: #ff0000; }
+            100% { background-color: #ffcccc; }
+        }
+
+        @keyframes longline-highlight-fade {
+            0% { background-color: #9c27b0; }
+            100% { background-color: #e1bee7; }
+        }
+
+        /* Highlight for text exceeding max length */
+        .excess-text {
+            background-color: #ffd54f;
+            padding: 2px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .excess-text:hover {
+            background-color: #ffc107;
+            box-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
+        }
+
+        /* Edit Mode styles */
+        .edit-mode-active tbody td:nth-child(4) {
+            cursor: crosshair !important;
+            position: relative;
+        }
+
+        .edit-mode-active tbody td:nth-child(4):hover {
+            background-color: #f0f0f0 !important;
+            transition: background-color 0.2s;
+        }
+
+        .split-preview-before {
+            background-color: #a5d6a7 !important;
+            padding: 2px 4px;
+            border-radius: 3px;
+            border-right: 3px solid #4caf50;
+        }
+
+        .split-preview-after {
+            background-color: #90caf9 !important;
+            padding: 2px 4px;
+            border-radius: 3px;
+            border-left: 3px solid #2196f3;
+        }
+
+        .split-preview-row {
+            background-color: #fff9c4 !important;
+            animation: split-preview-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes split-preview-pulse {
+            0%, 100% { box-shadow: 0 0 0 rgba(255, 193, 7, 0); }
+            50% { box-shadow: 0 0 10px rgba(255, 193, 7, 0.5); }
+        }
+
+        /* Split confirmation dialog overlay */
+        .split-dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .split-dialog {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .split-dialog h3 {
+            margin-top: 0;
+            color: #667eea;
+            font-size: 1.5em;
+        }
+
+        .split-dialog-preview {
+            margin: 20px 0;
+        }
+
+        .split-dialog-part {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+        }
+
+        .split-dialog-part.before {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4caf50;
+        }
+
+        .split-dialog-part.after {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+
+        .split-dialog-part strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .split-dialog-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .split-dialog-button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .split-dialog-button.confirm {
+            background: linear-gradient(135deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .split-dialog-button.confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .split-dialog-button.cancel {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .split-dialog-button.cancel:hover {
+            background: #e0e0e0;
+        }
+
+        .cell-number {
+            width: 80px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .cell-time {
+            width: 180px;
+            font-family: 'Courier New', monospace;
+            color: #666;
+        }
+
+        .cell-text {
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .cell-status {
+            width: 200px;
+            font-family: 'Courier New', monospace;
+            color: #9c27b0;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .cell-status.status-hidden {
+            display: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            margin: 20px 40px;
+            border-radius: 8px;
+            border-left: 4px solid #c62828;
+        }
+
+        .loading-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 768px) {
+            .info-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .subtitle-table th,
+            .subtitle-table td {
+                padding: 10px;
+                font-size: 0.9em;
+            }
+        }
+    </style>
+
+    <!-- Google Translate Script -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'auto',
+                includedLanguages: 'de,en,es,fr,it,pt,ru,zh,ja,ko,ar,hi',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</head>
+<body>
+    <!-- Floating Stop Button -->
+    <button id="floatingStopButton" class="floating-stop-button" onclick="stopAutoScroll()">
+        <span>⏸️</span>
+        <span>STOP</span>
+    </button>
+
+    <!-- Processing Status (Always visible when active) -->
+    <div id="processingStatus" class="processing-status">
+        <div class="processing-status-row">
+            <div class="processing-spinner"></div>
+            <span id="processingTitle" class="processing-title">Processing...</span>
+        </div>
+        <span id="processingDetails" class="processing-details"></span>
+    </div>
+
+    <div class="container">
+        <!-- Fixed Auto-Scroll Control Section -->
+        <div class="auto-scroll-section" id="autoScrollSection">
+            <span class="version-badge">v3.10.6 Edit-Mode</span>
+            <div class="controls-row">
+                <div class="auto-scroll-controls">
+                    <button id="toggleAutoScroll" class="scroll-button" onclick="toggleAutoScroll()">
+                        <span id="scrollIcon">▶️</span>
+                        <span id="scrollButtonText">Start</span>
+                    </button>
+                    <div class="delay-control">
+                        <label for="scrollDelay">Delay:</label>
+                        <input type="number" id="scrollDelay" value="3" min="1" max="60" step="0.5">
+                        <span>sec</span>
+                    </div>
+                </div>
+                <div class="checkbox-control">
+                    <input type="checkbox" id="smartScrollMode" checked onchange="updateScrollMode()">
+                    <label for="smartScrollMode">Smart</label>
+                </div>
+                <button id="youtubeCleanerButton" class="toggle-button" onclick="toggleYouTubeCleaner()">
+                    <span>🧹</span>
+                    <span>YouTube Cleaner</span>
+                </button>
+                <button id="joinSentencesButton" class="toggle-button" onclick="toggleJoinSentences()">
+                    <span>🔗</span>
+                    <span>Join Sentences</span>
+                </button>
+                <button id="fixLossTimesButton" class="toggle-button" onclick="toggleFixLossTimes()">
+                    <span>⏱️</span>
+                    <span>Fix Loss Times</span>
+                </button>
+                <button id="splitLonglinesButton" class="toggle-button" onclick="toggleSplitLonglines()">
+                    <span>✂️</span>
+                    <span>Split Longlines</span>
+                </button>
+                <button id="editModeButton" class="toggle-button" onclick="toggleEditMode()">
+                    <span>✏️</span>
+                    <span>Edit Mode</span>
+                </button>
+                <div class="delay-control">
+                    <label for="maxJoinLines">Max lines:</label>
+                    <input type="number" id="maxJoinLines" value="3" min="2" max="10" step="1">
+                </div>
+                <div class="delay-control">
+                    <label for="maxSubtitleLength">Max subts. length:</label>
+                    <input type="number" id="maxSubtitleLength" value="200" min="100" max="500" step="10">
+                </div>
+                <div class="delay-control">
+                    <label for="pageLanguage">Page Lang:</label>
+                    <select id="pageLanguage" onchange="changePageLanguage()" style="padding: 10px; border: 2px solid #4caf50; border-radius: 6px; font-size: 1em;">
+                        <option value="en">🇬🇧 EN</option>
+                        <option value="es">🇪🇸 ES</option>
+                        <option value="de">🇩🇪 DE</option>
+                        <option value="fr">🇫🇷 FR</option>
+                    </select>
+                </div>
+                <!-- Google Translate Widget -->
+                <div id="google_translate_element" style="margin-top: 10px;"></div>
+                <div class="stop-button-wrapper">
+                    <button id="searchLosstimeButton" class="export-button" onclick="searchNextLosstime()" disabled style="background: #ff9800; margin-right: 10px;">
+                        <span>🔍</span>
+                        <span>Search Losstime...</span>
+                    </button>
+                    <button id="searchLonglinesButton" class="export-button" onclick="searchNextLongline()" disabled style="background: #9c27b0; margin-right: 10px;">
+                        <span>📏</span>
+                        <span>Search Longlines</span>
+                    </button>
+                    <button id="exportButton" class="export-button" onclick="exportSRT()" disabled>
+                        <span>💾</span>
+                        <span>Export SRT</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header" id="mainHeader">
+            <h1>📝 SRT Parser & Visualizer</h1>
+            <p>Load your .srt subtitle file to visualize it with Smart Auto-Scroll</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <div class="upload-icon">📁</div>
+                <h2>Drag your file here</h2>
+                <p>or click to select a .srt file</p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" class="file-input" accept=".srt" onchange="handleFile(this.files[0])">
+                    <label for="fileInput" class="file-label">Select File</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div id="infoSection" class="info-section">
+            <h2>✨ Smart Auto-Scroll Features</h2>
+            <div class="language-tabs">
+                <button class="language-tab active" onclick="switchLanguage('en')">🇬🇧 English</button>
+                <button class="language-tab" onclick="switchLanguage('es')">🇪🇸 Español</button>
+                <button class="language-tab" onclick="switchLanguage('de')">🇩🇪 Deutsch</button>
+            </div>
+            
+            <!-- English Content -->
+            <div id="info-en" class="info-content active">
+                <div class="info-language">
+                    <h3>🧠 Smart Mode</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Automatically detects subtitle changes</li>
+                        <li><span class="feature-icon">✓</span> Advances immediately upon detecting modifications</li>
+                        <li><span class="feature-icon">✓</span> Virtual DOM comparison for optimal performance</li>
+                        <li><span class="feature-icon">✓</span> No unnecessary delays</li>
+                        <li><span class="feature-icon">✓</span> Fastest and most efficient process</li>
+                    </ul>
+                </div>
+                <div class="info-language">
+                    <h3>⚙️ Manual Mode</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Uses fixed time delay</li>
+                        <li><span class="feature-icon">✓</span> Advances every X configurable seconds</li>
+                        <li><span class="feature-icon">✓</span> Useful for paused manual review</li>
+                        <li><span class="feature-icon">✓</span> Precise speed control</li>
+                        <li><span class="feature-icon">✓</span> Compatible with any workflow</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Spanish Content -->
+            <div id="info-es" class="info-content">
+                <div class="info-language">
+                    <h3>🧠 Modo Inteligente</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Detecta automáticamente cambios en subtítulos</li>
+                        <li><span class="feature-icon">✓</span> Avanza inmediatamente al detectar modificaciones</li>
+                        <li><span class="feature-icon">✓</span> Comparación DOM virtual para rendimiento óptimo</li>
+                        <li><span class="feature-icon">✓</span> No espera delays innecesarios</li>
+                        <li><span class="feature-icon">✓</span> Proceso más rápido y eficiente</li>
+                    </ul>
+                </div>
+                <div class="info-language">
+                    <h3>⚙️ Modo Manual</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Usa delay de tiempo fijo</li>
+                        <li><span class="feature-icon">✓</span> Avanza cada X segundos configurables</li>
+                        <li><span class="feature-icon">✓</span> Útil para revisión manual pausada</li>
+                        <li><span class="feature-icon">✓</span> Control de velocidad preciso</li>
+                        <li><span class="feature-icon">✓</span> Compatible con cualquier workflow</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- German Content -->
+            <div id="info-de" class="info-content">
+                <div class="info-language">
+                    <h3>🧠 Intelligenter Modus</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Erkennt automatisch Untertiteländerungen</li>
+                        <li><span class="feature-icon">✓</span> Springt sofort weiter bei Änderungen</li>
+                        <li><span class="feature-icon">✓</span> Virtueller DOM-Vergleich für optimale Leistung</li>
+                        <li><span class="feature-icon">✓</span> Keine unnötigen Verzögerungen</li>
+                        <li><span class="feature-icon">✓</span> Schnellster und effizientester Prozess</li>
+                    </ul>
+                </div>
+                <div class="info-language">
+                    <h3>⚙️ Manueller Modus</h3>
+                    <ul>
+                        <li><span class="feature-icon">✓</span> Verwendet feste Zeitverzögerung</li>
+                        <li><span class="feature-icon">✓</span> Springt alle X konfigurierbaren Sekunden weiter</li>
+                        <li><span class="feature-icon">✓</span> Nützlich für pausierte manuelle Überprüfung</li>
+                        <li><span class="feature-icon">✓</span> Präzise Geschwindigkeitskontrolle</li>
+                        <li><span class="feature-icon">✓</span> Kompatibel mit jedem Workflow</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error" class="error-message hidden"></div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading-indicator hidden">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading subtitles...</div>
+        </div>
+
+        <!-- Statistics Section -->
+        <div id="stats" class="stats-section hidden">
+            <div class="stat-card">
+                <div class="stat-value" id="totalSubs">0</div>
+                <div class="stat-label">Total Subtitles</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="duration">00:00:00</div>
+                <div class="stat-label">Total Duration</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="fileName">-</div>
+                <div class="stat-label">File</div>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div id="tableContainer" class="table-container hidden">
+            <table class="subtitle-table">
+                <thead>
+                    <tr>
+                        <th class="cell-number">#</th>
+                        <th class="cell-time">Start</th>
+                        <th class="cell-time">End</th>
+                        <th class="cell-text">Text</th>
+                        <th class="cell-status" id="statusColumnHeader">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let autoScrollInterval = null;
+        let autoScrollActive = false;
+        let currentRowIndex = 0;
+        let smartScrollMode = true;
+        let currentSubtitles = null;
+        let currentFileName = null;
+        let lastLosstimeSearchIndex = -1; // Track last search position for losstime
+        let lastLonglineSearchIndex = -1; // Track last search position for longlines
+        let editModeActive = false; // Track edit mode state
+        let currentSplitPreview = null; // Store current split preview data
+
+        // Status column tracking system
+        let originalStatusText = '((Waiting, Espera, Warten))';
+        let lastFoundIndex = 0;
+        let comparisonInterval = null;
+        let noChangeTimeout = null;
+
+        function switchLanguage(lang) {
+            document.querySelectorAll('.language-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.info-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`info-${lang}`).classList.add('active');
+        }
+
+        function updateProgress() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            if (rows.length === 0) {
+                document.title = 'SRT Parser - Smart Auto-Scroll';
+                return;
+            }
+
+            const percentage = Math.round((lastFoundIndex / rows.length) * 100);
+            document.title = `${percentage}% - SRT Parser`;
+        }
+
+        function showProcessingStatus(title, details = '') {
+            const statusDiv = document.getElementById('processingStatus');
+            const titleSpan = document.getElementById('processingTitle');
+            const detailsSpan = document.getElementById('processingDetails');
+            
+            titleSpan.textContent = title;
+            detailsSpan.textContent = details;
+            statusDiv.classList.add('visible');
+        }
+
+        function hideProcessingStatus() {
+            const statusDiv = document.getElementById('processingStatus');
+            statusDiv.classList.remove('visible');
+        }
+
+        function updateProcessingStatus(title, details = '') {
+            const titleSpan = document.getElementById('processingTitle');
+            const detailsSpan = document.getElementById('processingDetails');
+            
+            if (titleSpan) titleSpan.textContent = title;
+            if (detailsSpan) detailsSpan.textContent = details;
+        }
+
+        // Check for changes using status column
+        function checkForChanges() {
+            if (!autoScrollActive) return;
+
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            // Check if we've reached the end (no more rows to check)
+            if (lastFoundIndex >= rows.length) {
+                console.log('\n🏁 END OF DOCUMENT - All rows checked');
+                console.log('💾 Exporting translated file...');
+                stopDOMComparison();
+                exportSRT();
+                stopAutoScroll();
+                return;
+            }
+
+            // Search from lastFoundIndex onwards for the first unchanged status
+            let foundUnchanged = false;
+            for (let i = lastFoundIndex; i < rows.length; i++) {
+                const statusCell = rows[i].cells[4];
+                if (!statusCell) continue;
+
+                const currentStatusText = statusCell.textContent.trim();
+
+                // Check if this row still has the original status text (not translated)
+                if (currentStatusText === originalStatusText) {
+                    // Found a row that hasn't been translated yet
+                    console.log(`\n✅ Found UNCHANGED status at row #${i + 1}`);
+                    console.log(`   Status text: "${currentStatusText}"`);
+                    console.log(`   Waiting for translation...`);
+
+                    // Move to this row
+                    lastFoundIndex = i;
+                    scrollToRow(i);
+                    foundUnchanged = true;
+
+                    // Reset no-change timeout
+                    if (noChangeTimeout) {
+                        clearTimeout(noChangeTimeout);
+                    }
+                    startNoChangeTimeout();
+
+                    // Update status
+                    updateProcessingStatus('⏳ Waiting for translation', `Row #${i + 1} - Status: "${currentStatusText}"`);
+                    updateProgress();
+
+                    return; // Exit and wait for next check
+                }
+                else {
+                    // This row has been translated, log it and continue searching
+                    console.log(`🔄 Row #${i + 1} translated - Status changed from "${originalStatusText}" to "${currentStatusText}"`);
+                }
+            }
+
+            // If we scanned all remaining rows and found no unchanged status, we're done
+            if (!foundUnchanged) {
+                console.log('\n🏁 END OF DOCUMENT - No more unchanged rows found');
+                console.log('💾 Exporting translated file...');
+                stopDOMComparison();
+                exportSRT();
+                stopAutoScroll();
+            }
+        }
+
+        function startNoChangeTimeout() {
+            if (noChangeTimeout) {
+                clearTimeout(noChangeTimeout);
+            }
+            
+            noChangeTimeout = setTimeout(() => {
+                if (!autoScrollActive) return;
+                
+                console.log('⚠️ WARNING: No translation detected in 5 seconds');
+                
+                // Get current language
+                const activeLangTab = document.querySelector('.language-tab.active');
+                const currentLang = activeLangTab ? (activeLangTab.textContent.includes('English') ? 'en' : 
+                                                     activeLangTab.textContent.includes('Español') ? 'es' : 'de') : 'en';
+                
+                const messages = {
+                    en: {
+                        title: '⚠️ No translation detected',
+                        details: 'Please enable automatic translation in your browser (right-click → "Translate to...") for this page to work.'
+                    },
+                    es: {
+                        title: '⚠️ No se detectó traducción',
+                        details: 'Por favor, habilite la traducción automática en su navegador (clic derecho → "Traducir a...") para que funcione.'
+                    },
+                    de: {
+                        title: '⚠️ Keine Übersetzung erkannt',
+                        details: 'Bitte aktivieren Sie die automatische Übersetzung in Ihrem Browser (Rechtsklick → "Übersetzen in...").'
+                    }
+                };
+                
+                const msg = messages[currentLang] || messages.en;
+                updateProcessingStatus(msg.title, msg.details);
+                
+                // Restart timeout
+                startNoChangeTimeout();
+            }, 5000);
+        }
+
+        function startDOMComparison() {
+            // Initialize tracking
+            lastFoundIndex = 0;
+
+            console.log('🚀 Starting status column monitoring...');
+            console.log(`   Continuous execution mode (no delay)`);
+            console.log(`   Starting from row #${lastFoundIndex + 1}`);
+            console.log(`   Looking for status: "${originalStatusText}"`);
+
+            // Show status
+            showProcessingStatus('🔄 Smart scroll active', `Monitoring row #${lastFoundIndex + 1} - Waiting for translation...`);
+
+            // Start continuous checking loop
+            function continuousCheck() {
+                if (!autoScrollActive) return;
+
+                checkForChanges();
+
+                // Immediately schedule next check (no delay)
+                comparisonInterval = setTimeout(() => {
+                    continuousCheck();
+                }, 0); // 0ms = execute as soon as possible
+            }
+
+            continuousCheck();
+
+            // Start no-change timeout
+            startNoChangeTimeout();
+        }
+
+        function stopDOMComparison() {
+            if (comparisonInterval) {
+                clearTimeout(comparisonInterval); // Changed from clearInterval
+                comparisonInterval = null;
+            }
+
+            if (noChangeTimeout) {
+                clearTimeout(noChangeTimeout);
+                noChangeTimeout = null;
+            }
+
+            console.log('⏹️ DOM comparison stopped');
+        }
+
+        function scrollToRow(index) {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            
+            if (index >= rows.length) {
+                return;
+            }
+            
+            // Remove highlight from all rows
+            Array.from(rows).forEach(row => row.classList.remove('highlight'));
+            
+            // Highlight current row
+            const currentRow = rows[index];
+            currentRow.classList.add('highlight');
+            
+            // Scroll into view
+            currentRow.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            
+            const textCell = currentRow.cells[3];
+            const cellText = textCell ? textCell.textContent : '';
+            
+            console.log(`\n📍 Now at row #${index + 1} of ${rows.length}`);
+            console.log(`   Text: ${cellText.substring(0, 60)}...`);
+        }
+
+        function updateScrollMode() {
+            smartScrollMode = document.getElementById('smartScrollMode').checked;
+            
+            if (smartScrollMode) {
+                console.log('🧠 Smart scroll mode enabled - will detect changes');
+            } else {
+                console.log('⏱️ Manual scroll mode enabled - will use fixed delay');
+            }
+            
+            if (autoScrollActive) {
+                stopAutoScroll();
+                startAutoScroll();
+            }
+        }
+
+        function toggleAutoScroll() {
+            if (autoScrollActive) {
+                stopAutoScroll();
+            } else {
+                startAutoScroll();
+            }
+        }
+
+        function startAutoScroll() {
+            // Scroll to top of document
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('Please load an SRT file first');
+                return;
+            }
+
+            autoScrollActive = true;
+            
+            // Hide header and show floating button
+            document.getElementById('autoScrollSection').style.display = 'none';
+            document.getElementById('mainHeader').classList.add('no-controls');
+            document.getElementById('floatingStopButton').classList.add('visible');
+
+            console.log(`\n${'='.repeat(60)}`);
+            console.log(`🚀 AUTO-SCROLL STARTED - Mode: ${smartScrollMode ? 'SMART 🧠' : 'MANUAL ⏱️'}`);
+            console.log(`${'='.repeat(60)}\n`);
+
+            if (smartScrollMode) {
+                // Start smart DOM comparison
+                startDOMComparison();
+                // Scroll to first row
+                scrollToRow(0);
+            } else {
+                // Manual mode
+                currentRowIndex = 0;
+                scrollToNextRowManual();
+            }
+            
+            updateProgress();
+        }
+
+        function scrollToNextRowManual() {
+            if (!autoScrollActive) return;
+            
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+            
+            if (currentRowIndex >= rows.length) {
+                console.log('\n🏁 END OF DOCUMENT');
+                exportSRT();
+                stopAutoScroll();
+                return;
+            }
+            
+            scrollToRow(currentRowIndex);
+            currentRowIndex++;
+            
+            const delay = parseFloat(document.getElementById('scrollDelay').value) * 1000;
+            autoScrollInterval = setTimeout(() => {
+                scrollToNextRowManual();
+            }, delay);
+        }
+
+        function stopAutoScroll() {
+            autoScrollActive = false;
+            
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+            
+            stopDOMComparison();
+            
+            // Show header and hide floating button
+            document.getElementById('autoScrollSection').style.display = '';
+            document.getElementById('mainHeader').classList.remove('no-controls');
+            document.getElementById('floatingStopButton').classList.remove('visible');
+            
+            // Hide processing status
+            hideProcessingStatus();
+            
+            console.log('\n⏹️ AUTO-SCROLL STOPPED\n');
+            
+            document.title = 'SRT Parser - Smart Auto-Scroll';
+        }
+
+        // Drag and drop
+        const uploadBox = document.getElementById('uploadBox');
+        
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.srt')) {
+                handleFile(file);
+            } else {
+                showError('Please upload a .srt file');
+            }
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            
+            showProcessingStatus('📂 Loading SRT file...', `Reading "${file.name}"`);
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    updateProcessingStatus('🔍 Parsing subtitles...', 'Analyzing SRT format');
+                    
+                    const content = e.target.result;
+                    const subtitles = parseSRT(content);
+                    
+                    updateProcessingStatus('✅ Parsing complete', `Found ${subtitles.length} subtitles`);
+                    
+                    currentSubtitles = subtitles;
+                    currentFileName = file.name;
+
+                    if (isYouTubeCleanerActive()) {
+                        const improved = improveYouTubeSubtitles(subtitles);
+                        displaySubtitles(improved, file.name);
+
+                        // Apply join sentences if button is active
+                        if (isJoinSentencesActive()) {
+                            setTimeout(() => {
+                                handleJoinSentences();
+                            }, 200);
+                        }
+                    } else {
+                        displaySubtitles(subtitles, file.name);
+                        hideProcessingStatus();
+
+                        // Apply join sentences if button is active
+                        if (isJoinSentencesActive()) {
+                            setTimeout(() => {
+                                handleJoinSentences();
+                            }, 200);
+                        }
+                    }
+
+                    document.getElementById('loading').classList.add('hidden');
+                } catch (error) {
+                    document.getElementById('loading').classList.add('hidden');
+                    hideProcessingStatus();
+                    showError('Error processing file: ' + error.message);
+                }
+            };
+
+            reader.onerror = function() {
+                document.getElementById('loading').classList.add('hidden');
+                hideProcessingStatus();
+                showError('Error reading file');
+            };
+
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseSRT(content) {
+            const subtitles = [];
+            const blocks = content.trim().split(/\n\s*\n/);
+            
+            blocks.forEach(block => {
+                const lines = block.trim().split('\n');
+                
+                if (lines.length >= 3) {
+                    const number = lines[0].trim();
+                    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+                    
+                    if (timeMatch) {
+                        const startTime = timeMatch[1];
+                        const endTime = timeMatch[2];
+                        const text = lines.slice(2).join('\n').trim();
+                        
+                        subtitles.push({
+                            number: number,
+                            startTime: startTime,
+                            endTime: endTime,
+                            text: text,
+                            originalText: text
+                        });
+                    }
+                }
+            });
+            
+            return subtitles;
+        }
+
+        function improveYouTubeSubtitles(subtitles) {
+            if (!subtitles || subtitles.length === 0) return subtitles;
+            
+            console.log('🎬 Starting YouTube subtitle improvement...');
+            showProcessingStatus('🎬 Improving YouTube subtitles...', `Processing ${subtitles.length} entries`);
+            
+            const improved = [];
+            const processedLines = new Set();
+            
+            for (let i = 0; i < subtitles.length; i++) {
+                const current = subtitles[i];
+                const lines = current.text.split('\n').map(line => line.trim());
+                
+                if (i % 10 === 0) {
+                    const progress = Math.round((i / subtitles.length) * 100);
+                    updateProcessingStatus('🎬 Improving YouTube subtitles...', `Progress: ${progress}% (${i}/${subtitles.length})`);
+                }
+                
+                for (const line of lines) {
+                    if (!line || processedLines.has(line) || line.match(/^\[.*\]$/)) continue;
+                    
+                    let lastOccurrence = i;
+                    for (let j = i + 1; j < subtitles.length; j++) {
+                        const nextLines = subtitles[j].text.split('\n').map(l => l.trim()).filter(l => l);
+                        if (nextLines.includes(line)) {
+                            const hasNewLine = nextLines.some(nl => nl !== line && !processedLines.has(nl) && !nl.match(/^\[.*\]$/));
+                            if (hasNewLine) break;
+                            lastOccurrence = j;
+                        }
+                    }
+                    
+                    processedLines.add(line);
+                    improved.push({
+                        number: improved.length + 1,
+                        startTime: subtitles[i].startTime,
+                        endTime: subtitles[lastOccurrence].endTime,
+                        text: line + '\n ',
+                        originalText: current.originalText
+                    });
+                }
+            }
+            
+            console.log(`✅ Reduced from ${subtitles.length} to ${improved.length} subtitles`);
+            updateProcessingStatus('✅ YouTube improvement complete!', `Reduced from ${subtitles.length} to ${improved.length} subtitles`);
+            setTimeout(() => hideProcessingStatus(), 2000);
+            
+            return improved;
+        }
+
+        function reprocessSubtitles() {
+            if (!currentSubtitles || !currentFileName) return;
+
+            showProcessingStatus('🔄 Reprocessing subtitles...', 'Please wait...');
+
+            setTimeout(() => {
+                // Always start from originalText
+                let processedSubs = currentSubtitles.map(sub => ({
+                    ...sub,
+                    text: sub.originalText
+                }));
+
+                if (isYouTubeCleanerActive()) {
+                    processedSubs = improveYouTubeSubtitles(processedSubs);
+                } else {
+                    hideProcessingStatus();
+                }
+
+                // NOTE: We DO NOT update currentSubtitles here to preserve the original state
+                // This allows reverting to original when buttons are toggled
+                displaySubtitles(processedSubs, currentFileName);
+
+                // Apply join sentences if button is active
+                if (isJoinSentencesActive()) {
+                    setTimeout(() => {
+                        handleJoinSentences();
+                    }, 200);
+                }
+            }, 100);
+        }
+
+        // ============================================
+        // TOGGLE BUTTON CONTROLS
+        // ============================================
+
+        /**
+         * Toggle YouTube Cleaner button
+         */
+        function toggleYouTubeCleaner() {
+            const button = document.getElementById('youtubeCleanerButton');
+            button.classList.toggle('active');
+            reprocessSubtitles();
+        }
+
+        /**
+         * Toggle Join Sentences button
+         */
+        function toggleJoinSentences() {
+            const button = document.getElementById('joinSentencesButton');
+            button.classList.toggle('active');
+
+            if (button.classList.contains('active')) {
+                handleJoinSentences();
+            } else {
+                reprocessSubtitles();
+            }
+        }
+
+        /**
+         * Toggle Fix Loss Times button
+         */
+        function toggleFixLossTimes() {
+            const button = document.getElementById('fixLossTimesButton');
+            button.classList.toggle('active');
+            // This only affects the joinSentences() function behavior
+            // If join sentences is active, reapply it
+            if (document.getElementById('joinSentencesButton').classList.contains('active')) {
+                handleJoinSentences();
+            }
+        }
+
+        /**
+         * Check if YouTube Cleaner is active
+         */
+        function isYouTubeCleanerActive() {
+            return document.getElementById('youtubeCleanerButton').classList.contains('active');
+        }
+
+        /**
+         * Check if Join Sentences is active
+         */
+        function isJoinSentencesActive() {
+            return document.getElementById('joinSentencesButton').classList.contains('active');
+        }
+
+        /**
+         * Check if Fix Loss Times is active
+         */
+        function isFixLossTimesActive() {
+            return document.getElementById('fixLossTimesButton').classList.contains('active');
+        }
+
+        /**
+         * Execute Split Longlines on current subtitle state
+         * Each click applies the split algorithm again on the current content
+         */
+        function toggleSplitLonglines() {
+            // Always execute split, allowing multiple consecutive applications
+            splitLonglines();
+        }
+
+        /**
+         * Check if Split Longlines is active
+         * Note: This function kept for compatibility, but Split Longlines now executes on each click
+         */
+        function isSplitLonglinesActive() {
+            return document.getElementById('splitLonglinesButton').classList.contains('active');
+        }
+
+        /**
+         * Apply join sentences to current table content
+         */
+        function handleJoinSentences() {
+            joinSentences();
+        }
+
+        function displaySubtitles(subtitles, fileName) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (subtitles.length === 0) {
+                showError('No subtitles found in file');
+                return;
+            }
+
+            subtitles.forEach(sub => {
+                const row = tbody.insertRow();
+
+                const cellNumber = row.insertCell(0);
+                const cellStart = row.insertCell(1);
+                const cellEnd = row.insertCell(2);
+                const cellText = row.insertCell(3);
+                const cellStatus = row.insertCell(4); // Status column
+
+                cellNumber.textContent = sub.number;
+                cellStart.textContent = sub.startTime;
+                cellEnd.textContent = sub.endTime;
+                cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
+
+                // Add status text - visible by default, will be translated by browser
+                cellStatus.textContent = originalStatusText;
+                cellStatus.className = 'cell-status';
+            });
+
+            document.getElementById('totalSubs').textContent = subtitles.length.toLocaleString();
+            document.getElementById('fileName').textContent = fileName;
+            
+            if (subtitles.length > 0) {
+                const lastTime = subtitles[subtitles.length - 1].endTime;
+                document.getElementById('duration').textContent = lastTime.split(',')[0];
+            }
+
+            document.getElementById('infoSection').classList.add('hidden');
+            document.getElementById('tableContainer').classList.remove('hidden');
+            document.getElementById('stats').classList.remove('hidden');
+            document.getElementById('exportButton').disabled = false;
+            document.getElementById('searchLosstimeButton').disabled = false;
+            document.getElementById('searchLonglinesButton').disabled = false;
+
+            setTimeout(() => {
+                const firstRow = tbody.getElementsByTagName('tr')[0];
+                if (firstRow) {
+                    firstRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    console.log('📍 Scrolled to first subtitle');
+                }
+            }, 300);
+        }
+
+        /**
+         * Convert SRT time format (HH:MM:SS,mmm) to total seconds
+         */
+        function timeToSeconds(timeString) {
+            const parts = timeString.split(':');
+            const hours = parseInt(parts[0]);
+            const minutes = parseInt(parts[1]);
+            const secondsParts = parts[2].split(',');
+            const seconds = parseInt(secondsParts[0]);
+            const milliseconds = parseInt(secondsParts[1] || 0);
+
+            return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
+        }
+
+        /**
+         * Convert total seconds to SRT time format (HH:MM:SS,mmm)
+         */
+        function secondsToTime(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            const milliseconds = Math.round((totalSeconds % 1) * 1000);
+
+            const hh = String(hours).padStart(2, '0');
+            const mm = String(minutes).padStart(2, '0');
+            const ss = String(seconds).padStart(2, '0');
+            const mmm = String(milliseconds).padStart(3, '0');
+
+            return `${hh}:${mm}:${ss},${mmm}`;
+        }
+
+        function joinSentences() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles to process');
+                return;
+            }
+
+            showProcessingStatus('🔗 Joining sentences...', 'Processing subtitles');
+
+            // Extract current subtitles from table
+            const subtitles = [];
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                subtitles.push({
+                    number: cells[0].textContent,
+                    startTime: cells[1].textContent,
+                    endTime: cells[2].textContent,
+                    text: cells[3].innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim(),
+                    status: cells[4] ? cells[4].textContent : originalStatusText
+                });
+            }
+
+            console.log(`\n🔗 Starting Join Sentences - ${subtitles.length} subtitles`);
+
+            // Get max lines to join before splitting on subordinate clauses
+            const maxJoinLines = parseInt(document.getElementById('maxJoinLines').value) || 3;
+            console.log(`   Max lines before subordinate split: ${maxJoinLines}`);
+
+            // Common abbreviations that end with period but are NOT sentence endings
+            const abbreviations = [
+                'z\\.\\s*B',     // z. B. (German: zum Beispiel)
+                'p\\.\\s*ej',    // p. ej. (Spanish: por ejemplo)
+                'ej',            // ej. (Spanish: ejemplo)
+                'etc',           // etc.
+                'Dr',            // Dr.
+                'Sr',            // Sr.
+                'Sra',           // Sra.
+                'vs',            // vs.
+                'e\\.\\s*g',     // e.g.
+                'i\\.\\s*e',     // i.e.
+                'ca',            // ca. (circa)
+                'aprox',         // aprox.
+                'pág',           // pág.
+                'vol',           // vol.
+                'no',            // no. (number)
+                'núm'            // núm.
+            ];
+
+            // Subordinate clause markers (conjunctions that introduce dependent clauses)
+            const subordinateMarkers = {
+                de: ['dass', 'weil', 'ob', 'wenn', 'als', 'damit', 'obwohl', 'bevor', 'nachdem',
+                     'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'deshalb',
+                     'trotzdem', 'danach', 'zuerst', 'außerdem'],
+                es: ['que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
+                     'para que', 'ya que', 'puesto que', 'dado que', 'a pesar de', 'sin embargo',
+                     'por lo tanto', 'entonces', 'además', 'también', 'pero', 'sino', 'o', 'y'],
+                en: ['that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
+                     'since', 'unless', 'until', 'whereas', 'so that', 'in order to', 'however',
+                     'therefore', 'thus', 'moreover', 'furthermore', 'but', 'or', 'and', 'yet']
+            };
+
+            // Flatten all subordinate markers into one array (case-insensitive)
+            const allSubordinateMarkers = [
+                ...subordinateMarkers.de,
+                ...subordinateMarkers.es,
+                ...subordinateMarkers.en
+            ];
+
+            // Function to check if text starts with a subordinate marker
+            function startsWithSubordinateMarker(text) {
+                const lowerText = text.trim().toLowerCase();
+                return allSubordinateMarkers.some(marker => {
+                    const pattern = new RegExp(`^${marker}\\b`, 'i');
+                    return pattern.test(lowerText);
+                });
+            }
+
+            // Create regex to detect real sentence endings (not abbreviations)
+            const abbrevPattern = `(?<!\\b(?:${abbreviations.join('|')}))\\.`;
+            const sentenceEndPattern = new RegExp(`${abbrevPattern}\\s*$|[!?]\.{0,2}\\s*$`);
+
+            // Helper function to check if text ends with real sentence terminator
+            function endsWithRealTerminator(text) {
+                // First check if ends with ! or ?
+                if (/[!?]\.{0,2}\s*$/.test(text)) {
+                    return true;
+                }
+                // Then check if ends with period that's not part of abbreviation
+                return sentenceEndPattern.test(text);
+            }
+
+            // Process sentences
+            const joined = [];
+            let i = 0;
+
+            while (i < subtitles.length) {
+                let currentText = subtitles[i].text;
+                const startTime = subtitles[i].startTime;
+                let endTime = subtitles[i].endTime;
+                const status = subtitles[i].status;
+
+                // Check if current line ends with sentence terminator
+                const endsWithTerminator = endsWithRealTerminator(currentText);
+
+                if (!endsWithTerminator && i < subtitles.length - 1) {
+                    // Join with following lines until we find a terminator
+                    let j = i + 1;
+                    let linesJoined = 1; // Count of lines joined (starting with 1 for current line)
+                    const originalSubtitles = [subtitles[i]]; // Keep track of original subtitles being joined
+
+                    while (j < subtitles.length) {
+                        const nextLineText = subtitles[j].text;
+
+                        // Check if we've joined enough lines and next line starts with subordinate marker
+                        if (linesJoined >= maxJoinLines && startsWithSubordinateMarker(nextLineText)) {
+                            console.log(`  ⚠ Stopping at row ${j + 1}: reached ${linesJoined} lines and found subordinate marker`);
+                            endTime = subtitles[j - 1].endTime; // Use previous line's end time
+                            j--; // Don't include this line
+                            break;
+                        }
+
+                        currentText += ' ' + nextLineText;
+                        endTime = subtitles[j].endTime;
+                        originalSubtitles.push(subtitles[j]); // Track original subtitle
+                        linesJoined++;
+
+                        // Check if this line ends with terminator
+                        if (endsWithRealTerminator(nextLineText)) {
+                            break;
+                        }
+                        j++;
+                    }
+
+                    console.log(`✓ Joined rows ${i + 1} to ${j + 1} (${linesJoined} lines)`);
+                    console.log(`  Original time slots:`, originalSubtitles.map(s => `${s.startTime}-${s.endTime}`).join(', '));
+
+                    // Split by real sentence terminators (respecting abbreviations)
+                    const sentences = [];
+                    let currentSentence = '';
+
+                    // Iterate through characters to find sentence boundaries
+                    for (let charIdx = 0; charIdx < currentText.length; charIdx++) {
+                        const char = currentText[charIdx];
+                        currentSentence += char;
+
+                        // Check if we're at a potential sentence terminator
+                        if (char === '.' || char === '!' || char === '?') {
+                            // Look ahead to see if there are more dots (like ...)
+                            let extraDots = 0;
+                            while (charIdx + 1 + extraDots < currentText.length &&
+                                   currentText[charIdx + 1 + extraDots] === '.') {
+                                currentSentence += '.';
+                                extraDots++;
+                                charIdx++;
+                            }
+
+                            // Check if the next character is a space or end of string
+                            const nextChar = currentText[charIdx + 1];
+                            const isEndOrSpace = !nextChar || /\s/.test(nextChar);
+
+                            if (isEndOrSpace) {
+                                // Check if this is part of an abbreviation
+                                const textBeforeTerminator = currentSentence.substring(0, currentSentence.length - 1 - extraDots).trim();
+                                const isAbbrev = abbreviations.some(abbr => {
+                                    const regex = new RegExp(`\\b${abbr}$`, 'i');
+                                    return regex.test(textBeforeTerminator);
+                                });
+
+                                if (!isAbbrev && char !== '.') {
+                                    // Definite sentence end (! or ?)
+                                    sentences.push(currentSentence.trim());
+                                    currentSentence = '';
+                                } else if (!isAbbrev && char === '.') {
+                                    // Period that's not an abbreviation
+                                    // Check if next non-space character is uppercase (new sentence)
+                                    let nextNonSpace = '';
+                                    for (let ahead = charIdx + 1; ahead < currentText.length; ahead++) {
+                                        if (!/\s/.test(currentText[ahead])) {
+                                            nextNonSpace = currentText[ahead];
+                                            break;
+                                        }
+                                    }
+
+                                    // If next character is uppercase or end of text, it's a sentence boundary
+                                    if (!nextNonSpace || /[A-ZÄÖÜ]/.test(nextNonSpace)) {
+                                        sentences.push(currentSentence.trim());
+                                        currentSentence = '';
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Add remaining text as last sentence
+                    if (currentSentence.trim()) {
+                        sentences.push(currentSentence.trim());
+                    }
+
+                    if (sentences.length > 1) {
+                        // Multiple sentences found - split them
+                        console.log(`  → Found ${sentences.length} sentences, splitting...`);
+
+                        // Calculate proportional time distribution based on sentence length
+                        // Using the original subtitle time slots for better accuracy
+                        const totalTextLength = sentences.reduce((sum, s) => sum + s.length, 0);
+
+                        // Calculate time slots from original subtitles
+                        const timeSlots = originalSubtitles.map(sub => ({
+                            startSeconds: timeToSeconds(sub.startTime),
+                            endSeconds: timeToSeconds(sub.endTime),
+                            duration: timeToSeconds(sub.endTime) - timeToSeconds(sub.startTime)
+                        }));
+
+                        const totalDuration = timeSlots.reduce((sum, slot) => sum + slot.duration, 0);
+                        const globalStartSeconds = timeSlots[0].startSeconds;
+                        const globalEndSeconds = timeSlots[timeSlots.length - 1].endSeconds;
+
+                        let currentTimeOffset = 0;
+                        const MIN_DURATION = 0.1; // Minimum 100ms duration for any subtitle
+
+                        for (let k = 0; k < sentences.length; k++) {
+                            const sentence = sentences[k].trim();
+                            if (sentence) {
+                                // Calculate this sentence's proportion of total time
+                                const sentenceLength = sentence.length;
+                                let proportionalDuration = (sentenceLength / totalTextLength) * totalDuration;
+
+                                // Ensure minimum duration to avoid invisible subtitles
+                                if (proportionalDuration < MIN_DURATION && k < sentences.length - 1) {
+                                    proportionalDuration = MIN_DURATION;
+                                }
+
+                                const sentenceStartSeconds = globalStartSeconds + currentTimeOffset;
+                                let sentenceEndSeconds;
+
+                                if (k === sentences.length - 1) {
+                                    // Last sentence gets exact end time
+                                    sentenceEndSeconds = globalEndSeconds;
+                                } else {
+                                    sentenceEndSeconds = sentenceStartSeconds + proportionalDuration;
+                                    // Ensure we don't exceed the global end time
+                                    if (sentenceEndSeconds > globalEndSeconds) {
+                                        sentenceEndSeconds = globalEndSeconds;
+                                    }
+                                }
+
+                                // Final safety check: ensure start < end
+                                if (sentenceEndSeconds <= sentenceStartSeconds) {
+                                    sentenceEndSeconds = sentenceStartSeconds + MIN_DURATION;
+                                }
+
+                                joined.push({
+                                    number: joined.length + 1,
+                                    startTime: secondsToTime(sentenceStartSeconds),
+                                    endTime: secondsToTime(sentenceEndSeconds),
+                                    text: sentence,
+                                    status: status
+                                });
+
+                                currentTimeOffset += proportionalDuration;
+                                console.log(`    Sentence ${k + 1}: ${secondsToTime(sentenceStartSeconds)} → ${secondsToTime(sentenceEndSeconds)} (${sentence.substring(0, 30)}...)`);
+                            }
+                        }
+                    } else {
+                        // Single sentence
+                        joined.push({
+                            number: joined.length + 1,
+                            startTime: startTime,
+                            endTime: endTime,
+                            text: currentText.trim(),
+                            status: status
+                        });
+                    }
+
+                    i = j + 1;
+                } else {
+                    // Line already ends with terminator or is last line
+                    joined.push({
+                        number: joined.length + 1,
+                        startTime: startTime,
+                        endTime: endTime,
+                        text: currentText.trim(),
+                        status: status
+                    });
+                    i++;
+                }
+            }
+
+            console.log(`✅ Join complete - reduced from ${subtitles.length} to ${joined.length} subtitles`);
+
+            // ============================================
+            // POST-PROCESSING: Merge subtitles with same start and end time (if Fix Loss Times is active)
+            // ============================================
+            let finalJoined = joined;
+
+            if (isFixLossTimesActive()) {
+                console.log('\n🔍 Post-processing: checking for subtitles with same start/end time...');
+
+                const fixedJoined = [];
+                for (let idx = 0; idx < joined.length; idx++) {
+                    const current = joined[idx];
+
+                    // Check if start time equals end time (invisible subtitle)
+                    if (current.startTime === current.endTime) {
+                        console.log(`  ⚠ Found invisible subtitle at index ${idx}: "${current.text.substring(0, 30)}..."`);
+
+                        // Merge with previous subtitle
+                        if (fixedJoined.length > 0) {
+                            const previous = fixedJoined[fixedJoined.length - 1];
+                            previous.text = previous.text + ' ' + current.text;
+                            console.log(`  ✓ Merged with previous subtitle. New text: "${previous.text.substring(0, 50)}..."`);
+                        } else {
+                            // If it's the first subtitle, we can't merge with previous
+                            // Just add it as is (this should rarely happen)
+                            console.log(`  ⚠ Cannot merge (first subtitle), keeping as is`);
+                            fixedJoined.push(current);
+                        }
+                    } else {
+                        // Normal subtitle, add to final list
+                        fixedJoined.push(current);
+                    }
+                }
+
+                // Renumber subtitles after merging
+                fixedJoined.forEach((sub, idx) => {
+                    sub.number = idx + 1;
+                });
+
+                console.log(`✅ Post-processing complete - ${joined.length} → ${fixedJoined.length} subtitles`);
+                finalJoined = fixedJoined;
+            } else {
+                console.log('\n⚠️ Fix Loss Times is disabled - skipping post-processing');
+            }
+
+            // Clear table and display joined subtitles
+            tableBody.innerHTML = '';
+
+            finalJoined.forEach(sub => {
+                const row = tableBody.insertRow();
+
+                const cellNumber = row.insertCell(0);
+                const cellStart = row.insertCell(1);
+                const cellEnd = row.insertCell(2);
+                const cellText = row.insertCell(3);
+                const cellStatus = row.insertCell(4);
+
+                cellNumber.textContent = sub.number;
+                cellStart.textContent = sub.startTime;
+                cellEnd.textContent = sub.endTime;
+                cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
+                cellStatus.textContent = sub.status;
+                cellStatus.className = 'cell-status';
+            });
+
+            // Update stats
+            document.getElementById('totalSubs').textContent = finalJoined.length.toLocaleString();
+
+            // NOTE: We DO NOT update currentSubtitles here to preserve the original state
+            // This allows reprocessSubtitles() to revert to the original when checkbox is unchecked
+
+            updateProcessingStatus('✅ Join complete!', `Reduced from ${subtitles.length} to ${finalJoined.length} subtitles`);
+            setTimeout(() => hideProcessingStatus(), 2000);
+        }
+
+        /**
+         * Split long subtitle lines (>150 characters) into smaller chunks
+         * Uses proportional time distribution and intelligent split points
+         */
+        function splitLonglines() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles to process');
+                return;
+            }
+
+            showProcessingStatus('✂️ Splitting long lines...', 'Processing subtitles');
+
+            // Extract current subtitles from table
+            const subtitles = [];
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                subtitles.push({
+                    number: cells[0].textContent,
+                    startTime: cells[1].textContent,
+                    endTime: cells[2].textContent,
+                    text: cells[3].innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim(),
+                    status: cells[4] ? cells[4].textContent : originalStatusText
+                });
+            }
+
+            // Get configurable max length from input
+            const MAX_LENGTH = parseInt(document.getElementById('maxSubtitleLength').value) || 200;
+            console.log(`\n✂️ Starting Split Longlines - ${subtitles.length} subtitles (MAX_LENGTH: ${MAX_LENGTH})`);
+
+            const MIN_DURATION = 0.1; // Minimum 100ms duration
+
+            // Subordinate conjunctions for intelligent splitting
+            const subordinateWords = [
+                // German (removed: was, die, das, als - these will be checked with comma prefix)
+                'weil', 'wenn', 'dass', 'ob', 'damit', 'obwohl', 'bevor', 'nachdem',
+                'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'ok', 'okay',
+                'auch', 'deswegen', 'also', 'wie', 'dann', 'wo',
+                // Spanish
+                'que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
+                'para que', 'ya que', 'pero', 'sino', 'o', 'y', 'ok', 'okey',
+                // English
+                'that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
+                'since', 'unless', 'until', 'but', 'or', 'and', 'yet', 'ok', 'okay', 'okey'
+            ];
+
+            // Words that require comma before them to be valid split points
+            const commaRequiredWords = [
+                // German articles and pronouns that are too common
+                'was', 'die', 'das', 'als', 'den'
+            ];
+
+            // Personal pronouns (for comma + pronoun detection)
+            const personalPronouns = [
+                // German
+                'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'Sie',
+                // Spanish
+                'yo', 'tú', 'él', 'ella', 'usted', 'nosotros', 'nosotras', 'vosotros', 'vosotras', 'ellos', 'ellas', 'ustedes',
+                // English
+                'i', 'you', 'he', 'she', 'it', 'we', 'they'
+            ];
+
+            const split = [];
+
+            for (let i = 0; i < subtitles.length; i++) {
+                const sub = subtitles[i];
+                const text = sub.text.replace(/\n/g, ' ').trim(); // Remove line breaks for processing
+
+                if (text.length <= MAX_LENGTH) {
+                    // Line is short enough, keep as is
+                    split.push(sub);
+                    continue;
+                }
+
+                console.log(`  ⚠ Long line (${text.length} chars): "${text.substring(0, 50)}..."`);
+
+                // Find best split point
+                const chunks = [];
+                let remainingText = text;
+
+                while (remainingText.length > MAX_LENGTH) {
+                    let splitPoint = -1;
+                    let strategy = '';
+
+                    // ============================================
+                    // SEARCH BACKWARDS FIRST (from MAX_LENGTH to 25% of MAX_LENGTH)
+                    // ============================================
+
+                    // Strategy 1A: Search BACKWARDS for sentence terminator (.?!)
+                    for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.25; j--) {
+                        if (/[.!?]/.test(remainingText[j])) {
+                            splitPoint = j + 1; // Include the punctuation
+                            strategy = 'sentence terminator (backward)';
+                            break;
+                        }
+                    }
+
+                    // Strategy 1.5A: Search BACKWARDS for comma + personal pronoun
+                    if (splitPoint === -1) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.25; j--) {
+                            if (remainingText[j] === ',') {
+                                // Check if after comma there's a space and then a personal pronoun
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (personalPronouns.includes(wordAfterComma)) {
+                                    splitPoint = j + 1; // Split after the comma
+                                    strategy = `comma + pronoun "${wordAfterComma}" (backward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2A: Search BACKWARDS for subordinate conjunction
+                    if (splitPoint === -1) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.25; j--) {
+                            if (remainingText[j] === ' ') {
+                                const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
+                                if (subordinateWords.includes(wordAfter)) {
+                                    splitPoint = j + 1; // Split before the subordinate word
+                                    strategy = `subordinate word "${wordAfter}" (backward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2.5A: Search BACKWARDS for comma + comma-required word
+                    if (splitPoint === -1) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= MAX_LENGTH * 0.25; j--) {
+                            if (remainingText[j] === ',') {
+                                // Check if after comma there's a space and then a comma-required word
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (commaRequiredWords.includes(wordAfterComma)) {
+                                    splitPoint = j + 1; // Split after the comma
+                                    strategy = `comma + word "${wordAfterComma}" (backward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // ============================================
+                    // SEARCH FORWARDS IF NOTHING FOUND BACKWARDS (from MAX_LENGTH to end)
+                    // ============================================
+
+                    // Strategy 1B: Search FORWARDS for sentence terminator (.?!)
+                    // Limit search to 2x MAX_LENGTH to avoid finding terminators too far away
+                    if (splitPoint === -1) {
+                        const maxSearchDistance = Math.min(remainingText.length, MAX_LENGTH * 2);
+                        for (let j = MAX_LENGTH; j < maxSearchDistance; j++) {
+                            if (/[.!?]/.test(remainingText[j])) {
+                                splitPoint = j + 1; // Include the punctuation
+                                strategy = 'sentence terminator (forward)';
+                                break;
+                            }
+                        }
+                    }
+
+                    // Strategy 1.5B: Search FORWARDS for comma + personal pronoun
+                    // Limit search to 2x MAX_LENGTH for efficiency
+                    if (splitPoint === -1) {
+                        const maxSearchDistance = Math.min(remainingText.length, MAX_LENGTH * 2);
+                        for (let j = MAX_LENGTH; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ',') {
+                                // Check if after comma there's a space and then a personal pronoun
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (personalPronouns.includes(wordAfterComma)) {
+                                    splitPoint = j + 1; // Split after the comma
+                                    strategy = `comma + pronoun "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2B: Search FORWARDS for subordinate conjunction
+                    // Limit search to 2x MAX_LENGTH for efficiency
+                    if (splitPoint === -1) {
+                        const maxSearchDistance = Math.min(remainingText.length, MAX_LENGTH * 2);
+                        for (let j = MAX_LENGTH; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ' ') {
+                                const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
+                                if (subordinateWords.includes(wordAfter)) {
+                                    splitPoint = j + 1; // Split before the subordinate word
+                                    strategy = `subordinate word "${wordAfter}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2.25B: Search FORWARDS for comma + comma-required word
+                    // Limit search to 2x MAX_LENGTH for efficiency
+                    if (splitPoint === -1) {
+                        const maxSearchDistance = Math.min(remainingText.length, MAX_LENGTH * 2);
+                        for (let j = MAX_LENGTH; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ',') {
+                                // Check if after comma there's a space and then a comma-required word
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (commaRequiredWords.includes(wordAfterComma)) {
+                                    splitPoint = j + 1; // Split after the comma
+                                    strategy = `comma + word "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2.5B: Search FORWARDS for any comma
+                    if (splitPoint === -1) {
+                        for (let j = MAX_LENGTH; j < remainingText.length; j++) {
+                            if (remainingText[j] === ',') {
+                                splitPoint = j + 1; // Split after the comma
+                                strategy = 'any comma (forward)';
+                                break;
+                            }
+                        }
+                    }
+
+                    // Strategy 3B: Search FORWARDS for first space
+                    if (splitPoint === -1) {
+                        for (let j = MAX_LENGTH; j < remainingText.length; j++) {
+                            if (remainingText[j] === ' ') {
+                                splitPoint = j + 1;
+                                strategy = 'first space (forward)';
+                                break;
+                            }
+                        }
+                    }
+
+                    // Strategy 4: Search BACKWARDS for any space (to avoid splitting mid-word)
+                    // This prevents cutting words like "z.B." or "sich" in half
+                    if (splitPoint === -1) {
+                        for (let j = Math.min(MAX_LENGTH, remainingText.length - 1); j >= 0; j--) {
+                            if (remainingText[j] === ' ') {
+                                splitPoint = j + 1;
+                                strategy = 'any space (backward from MAX_LENGTH)';
+                                break;
+                            }
+                        }
+                    }
+
+                    // Strategy 5: Absolute last resort - force split at MAX_LENGTH
+                    // This should almost never happen if text has any spaces
+                    if (splitPoint === -1) {
+                        console.warn(`⚠️ WARNING: No spaces found anywhere! Forcing split at MAX_LENGTH (may break word)`);
+                        splitPoint = MAX_LENGTH;
+                        strategy = 'force at MAX_LENGTH (NO SPACES FOUND)';
+                    }
+
+                    console.log(`    Split at position ${splitPoint} using: ${strategy}`);
+                    chunks.push(remainingText.substring(0, splitPoint).trim());
+                    remainingText = remainingText.substring(splitPoint).trim();
+                }
+
+                // Add remaining text
+                if (remainingText.length > 0) {
+                    chunks.push(remainingText);
+                }
+
+                console.log(`    → Split into ${chunks.length} chunks`);
+
+                // Calculate proportional time distribution
+                const totalTextLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                const startSeconds = timeToSeconds(sub.startTime);
+                const endSeconds = timeToSeconds(sub.endTime);
+                const totalDuration = endSeconds - startSeconds;
+
+                let currentTimeOffset = 0;
+                for (let k = 0; k < chunks.length; k++) {
+                    const chunk = chunks[k];
+                    const chunkLength = chunk.length;
+                    let proportionalDuration = (chunkLength / totalTextLength) * totalDuration;
+
+                    // Ensure minimum duration
+                    if (proportionalDuration < MIN_DURATION && k < chunks.length - 1) {
+                        proportionalDuration = MIN_DURATION;
+                    }
+
+                    const chunkStartSeconds = startSeconds + currentTimeOffset;
+                    let chunkEndSeconds;
+
+                    if (k === chunks.length - 1) {
+                        chunkEndSeconds = endSeconds; // Last chunk gets exact end time
+                    } else {
+                        chunkEndSeconds = chunkStartSeconds + proportionalDuration;
+                        if (chunkEndSeconds > endSeconds) {
+                            chunkEndSeconds = endSeconds;
+                        }
+                    }
+
+                    // Safety check
+                    if (chunkEndSeconds <= chunkStartSeconds) {
+                        chunkEndSeconds = chunkStartSeconds + MIN_DURATION;
+                    }
+
+                    split.push({
+                        number: split.length + 1,
+                        startTime: secondsToTime(chunkStartSeconds),
+                        endTime: secondsToTime(chunkEndSeconds),
+                        text: chunk,
+                        status: sub.status
+                    });
+
+                    currentTimeOffset += proportionalDuration;
+                    console.log(`      Chunk ${k + 1}: ${secondsToTime(chunkStartSeconds)} → ${secondsToTime(chunkEndSeconds)} (${chunk.substring(0, 30)}...)`);
+                }
+            }
+
+            console.log(`✅ Split complete - ${subtitles.length} → ${split.length} subtitles`);
+
+            // Clear table and display split subtitles
+            tableBody.innerHTML = '';
+
+            split.forEach(sub => {
+                const row = tableBody.insertRow();
+
+                const cellNumber = row.insertCell(0);
+                const cellStart = row.insertCell(1);
+                const cellEnd = row.insertCell(2);
+                const cellText = row.insertCell(3);
+                const cellStatus = row.insertCell(4);
+
+                cellNumber.textContent = sub.number;
+                cellStart.textContent = sub.startTime;
+                cellEnd.textContent = sub.endTime;
+                cellText.innerHTML = sub.text.replace(/\n/g, '<br>');
+                cellStatus.textContent = sub.status;
+                cellStatus.className = 'cell-status';
+            });
+
+            // Update stats
+            document.getElementById('totalSubs').textContent = split.length.toLocaleString();
+
+            updateProcessingStatus('✅ Split complete!', `Expanded from ${subtitles.length} to ${split.length} subtitles`);
+            setTimeout(() => hideProcessingStatus(), 2000);
+        }
+
+        /**
+         * Generate output filename with target language extension
+         * Examples:
+         *   de.srt → es.srt (if target is 'es')
+         *   training_de.srt → training_es.srt
+         *   subtitles.srt → subtitles_es.srt (no language code found)
+         */
+        function generateOutputFilename(originalFilename) {
+            if (!originalFilename) {
+                const targetLang = document.getElementById('pageLanguage').value;
+                return `subtitles_${targetLang}.srt`;
+            }
+
+            const targetLang = document.getElementById('pageLanguage').value;
+
+            // Common language codes to detect
+            const langCodes = ['de', 'en', 'es', 'fr', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi'];
+
+            // Try to find pattern like "_de.srt" or ".de.srt"
+            let replaced = false;
+            for (const langCode of langCodes) {
+                // Match patterns: _de.srt or .de.srt
+                const pattern1 = new RegExp(`_${langCode}\\.srt$`, 'i');
+                const pattern2 = new RegExp(`\\.${langCode}\\.srt$`, 'i');
+
+                if (pattern1.test(originalFilename)) {
+                    originalFilename = originalFilename.replace(pattern1, `_${targetLang}.srt`);
+                    replaced = true;
+                    break;
+                } else if (pattern2.test(originalFilename)) {
+                    originalFilename = originalFilename.replace(pattern2, `.${targetLang}.srt`);
+                    replaced = true;
+                    break;
+                }
+            }
+
+            // If no language code found, add target language before .srt
+            if (!replaced) {
+                originalFilename = originalFilename.replace('.srt', `_${targetLang}.srt`);
+            }
+
+            return originalFilename;
+        }
+
+        function exportSRT() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles to export');
+                return;
+            }
+
+            showProcessingStatus('💾 Exporting SRT file...', 'Generating file content');
+
+            let srtContent = '';
+
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const number = cells[0].textContent;
+                const startTime = cells[1].textContent;
+                const endTime = cells[2].textContent;
+                const text = cells[3].innerHTML
+                    .replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<[^>]+>/g, '')
+                    .trim();
+
+                srtContent += `${number}\n${startTime} --> ${endTime}\n${text}\n\n`;
+
+                if (i % 50 === 0 && i > 0) {
+                    const progress = Math.round((i / rows.length) * 100);
+                    updateProcessingStatus('💾 Exporting SRT file...', `Progress: ${progress}% (${i}/${rows.length})`);
+                }
+            }
+
+            updateProcessingStatus('💾 Creating download...', 'Almost done');
+
+            const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = generateOutputFilename(currentFileName);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('✅ SRT file exported successfully');
+            updateProcessingStatus('✅ Export complete!', 'File downloaded successfully');
+
+            setTimeout(() => hideProcessingStatus(), 2000);
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = '❌ ' + message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        // ============================================
+        // SEARCH LOSSTIME (INVISIBLE SUBTITLES)
+        // ============================================
+
+        /**
+         * Search for next subtitle with equal start and end time (invisible subtitle)
+         * Scrolls to and highlights the found row
+         */
+        function searchNextLosstime() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles loaded');
+                return;
+            }
+
+            // Start searching from position after last found
+            const startIndex = lastLosstimeSearchIndex + 1;
+            let foundIndex = -1;
+
+            console.log(`\n🔍 Searching for losstime from row ${startIndex + 1}...`);
+
+            // Search from current position to end
+            for (let i = startIndex; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const startTime = cells[1].textContent;
+                const endTime = cells[2].textContent;
+
+                if (startTime === endTime) {
+                    foundIndex = i;
+                    console.log(`  ⚠ Found losstime at row ${i + 1}: ${startTime} === ${endTime}`);
+                    break;
+                }
+            }
+
+            // If not found from current position, wrap around and search from beginning
+            if (foundIndex === -1 && startIndex > 0) {
+                console.log('  No losstime found after current position, wrapping to beginning...');
+                for (let i = 0; i < startIndex; i++) {
+                    const cells = rows[i].cells;
+                    const startTime = cells[1].textContent;
+                    const endTime = cells[2].textContent;
+
+                    if (startTime === endTime) {
+                        foundIndex = i;
+                        console.log(`  ⚠ Found losstime at row ${i + 1}: ${startTime} === ${endTime}`);
+                        break;
+                    }
+                }
+            }
+
+            if (foundIndex !== -1) {
+                // Found a losstime subtitle
+                lastLosstimeSearchIndex = foundIndex;
+
+                // Remove previous highlight
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].classList.remove('losstime-highlight');
+                }
+
+                // Highlight found row
+                rows[foundIndex].classList.add('losstime-highlight');
+
+                // Scroll to the row
+                rows[foundIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Show notification
+                const rowNumber = foundIndex + 1;
+                const startTime = rows[foundIndex].cells[1].textContent;
+                const text = rows[foundIndex].cells[3].textContent.substring(0, 50);
+
+                console.log(`✅ Navigated to row ${rowNumber}`);
+                updateProcessingStatus(
+                    `🔍 Losstime found at row ${rowNumber}`,
+                    `Time: ${startTime} | Text: "${text}..."`
+                );
+
+                setTimeout(() => hideProcessingStatus(), 3000);
+            } else {
+                // No losstime found
+                console.log('✅ No losstime subtitles found in document');
+                lastLosstimeSearchIndex = -1; // Reset for next search
+
+                alert('No invisible subtitles (losstime) found!\n\nAll subtitles have valid time ranges.');
+            }
+        }
+
+        // ============================================
+        // SEARCH LONGLINES (LINES EXCEEDING MAX LENGTH)
+        // ============================================
+
+        /**
+         * Search for next subtitle with text exceeding max length
+         * Highlights the excess text and makes it clickable for manual splitting
+         */
+        function searchNextLongline() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            if (rows.length === 0) {
+                alert('No subtitles loaded');
+                return;
+            }
+
+            const MAX_LENGTH = parseInt(document.getElementById('maxSubtitleLength').value) || 200;
+
+            // Count total longlines in document
+            let totalLonglines = 0;
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const text = cells[3].innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+                if (text.length > MAX_LENGTH) {
+                    totalLonglines++;
+                }
+            }
+
+            // Show toast message with count
+            if (totalLonglines > 0) {
+                showProcessingStatus(
+                    `📏 ${totalLonglines} longline${totalLonglines > 1 ? 's' : ''} found`,
+                    `Lines exceeding ${MAX_LENGTH} characters`
+                );
+                setTimeout(() => hideProcessingStatus(), 2500);
+            } else {
+                showProcessingStatus(
+                    `✅ No longlines found`,
+                    `All lines are within ${MAX_LENGTH} characters`
+                );
+                setTimeout(() => hideProcessingStatus(), 2500);
+            }
+
+            // Start searching from position after last found
+            const startIndex = lastLonglineSearchIndex + 1;
+            let foundIndex = -1;
+
+            console.log(`\n📏 Searching for longlines (>${MAX_LENGTH} chars) from row ${startIndex + 1}...`);
+            console.log(`  Total longlines in document: ${totalLonglines}`);
+
+            // Search from current position to end
+            for (let i = startIndex; i < rows.length; i++) {
+                const cells = rows[i].cells;
+                const text = cells[3].innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+                if (text.length > MAX_LENGTH) {
+                    foundIndex = i;
+                    console.log(`  ⚠ Found longline at row ${i + 1}: ${text.length} chars`);
+                    break;
+                }
+            }
+
+            // If not found from current position, wrap around and search from beginning
+            if (foundIndex === -1 && startIndex > 0) {
+                console.log('  No longline found after current position, wrapping to beginning...');
+                for (let i = 0; i < startIndex; i++) {
+                    const cells = rows[i].cells;
+                    const text = cells[3].innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+                    if (text.length > MAX_LENGTH) {
+                        foundIndex = i;
+                        console.log(`  ⚠ Found longline at row ${i + 1}: ${text.length} chars`);
+                        break;
+                    }
+                }
+            }
+
+            if (foundIndex !== -1) {
+                // Found a longline subtitle
+                lastLonglineSearchIndex = foundIndex;
+
+                // Remove previous highlights
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].classList.remove('longline-highlight');
+                }
+
+                // Highlight found row
+                rows[foundIndex].classList.add('longline-highlight');
+
+                // Activate edit mode if not already active
+                if (!editModeActive) {
+                    const editButton = document.getElementById('editModeButton');
+                    editButton.click(); // Activate edit mode
+                }
+
+                // Scroll to the row
+                rows[foundIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Show notification
+                const rowNumber = foundIndex + 1;
+                const textLength = rows[foundIndex].cells[3].textContent.length;
+                const excess = textLength - MAX_LENGTH;
+
+                console.log(`✅ Navigated to row ${rowNumber}`);
+                updateProcessingStatus(
+                    `📏 Longline found at row ${rowNumber} - Edit mode active`,
+                    `Length: ${textLength} chars (${excess} over limit) - Click text to split`
+                );
+
+                setTimeout(() => hideProcessingStatus(), 3000);
+            } else {
+                // No longline found
+                console.log('✅ No longlines found in document');
+                lastLonglineSearchIndex = -1; // Reset for next search
+
+                alert(`No long lines found!\n\nAll subtitles are within ${MAX_LENGTH} characters.`);
+            }
+        }
+
+        /**
+         * Highlight the text that exceeds the max length and make it clickable
+         */
+        function highlightExcessText(row, maxLength) {
+            const textCell = row.cells[3];
+            const fullText = textCell.innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+            if (fullText.length <= maxLength) {
+                return;
+            }
+
+            // Split text into normal part and excess part
+            const normalPart = fullText.substring(0, maxLength);
+            const excessPart = fullText.substring(maxLength);
+
+            // Create the highlighted HTML
+            const highlightedHTML = `${normalPart}<span class="excess-text" data-row-index="${row.rowIndex - 1}">${excessPart}</span>`;
+
+            textCell.innerHTML = highlightedHTML;
+
+            // Add click event to excess text
+            const excessSpan = textCell.querySelector('.excess-text');
+            if (excessSpan) {
+                excessSpan.addEventListener('click', function(event) {
+                    handleExcessTextClick(event, row, fullText, maxLength);
+                });
+            }
+        }
+
+        /**
+         * Handle click on excess text - prompt user to split at clicked position
+         */
+        function handleExcessTextClick(event, row, fullText, maxLength) {
+            // Get the click position within the text
+            const span = event.target;
+            const spanText = span.textContent;
+
+            // Calculate approximate character position based on click coordinates
+            const spanRect = span.getBoundingClientRect();
+            const clickX = event.clientX - spanRect.left;
+            const spanWidth = spanRect.width;
+            const clickRatio = clickX / spanWidth;
+            const clickPositionInSpan = Math.round(spanText.length * clickRatio);
+
+            // Calculate absolute position in full text
+            const splitPosition = maxLength + clickPositionInSpan;
+
+            // Show confirmation dialog
+            const beforeText = fullText.substring(0, splitPosition).trim();
+            const afterText = fullText.substring(splitPosition).trim();
+
+            const message = `Do you want to split this subtitle at this position?\n\n` +
+                          `BEFORE (${beforeText.length} chars):\n"${beforeText.substring(0, 50)}..."\n\n` +
+                          `AFTER (${afterText.length} chars):\n"${afterText.substring(0, 50)}..."\n\n` +
+                          `Click OK to split, Cancel to choose another position.`;
+
+            if (confirm(message)) {
+                splitSubtitleAtPosition(row, fullText, splitPosition);
+            }
+        }
+
+        /**
+         * Split a subtitle into two entries at specified character position
+         * Recalculates times proportionally based on text length
+         */
+        function splitSubtitleAtPosition(row, fullText, splitPosition) {
+            const tableBody = document.getElementById('tableBody');
+            const rowIndex = row.rowIndex - 1;
+
+            // Get original subtitle data
+            const cells = row.cells;
+            const number = cells[0].textContent;
+            const startTime = cells[1].textContent;
+            const endTime = cells[2].textContent;
+            const status = cells[4] ? cells[4].textContent : originalStatusText;
+
+            // Split text at position
+            const text1 = fullText.substring(0, splitPosition).trim();
+            const text2 = fullText.substring(splitPosition).trim();
+
+            if (!text1 || !text2) {
+                alert('Split would create empty subtitle. Please choose a different position.');
+                return;
+            }
+
+            console.log(`\n✂️ Manual split at position ${splitPosition}:`);
+            console.log(`  Part 1 (${text1.length} chars): "${text1.substring(0, 50)}..."`);
+            console.log(`  Part 2 (${text2.length} chars): "${text2.substring(0, 50)}..."`);
+
+            // Calculate proportional times
+            const MIN_DURATION = 0.1; // 100ms minimum
+            const startSeconds = timeToSeconds(startTime);
+            const endSeconds = timeToSeconds(endTime);
+            const totalDuration = endSeconds - startSeconds;
+
+            // Proportional time distribution based on text length
+            const totalLength = text1.length + text2.length;
+            const proportion1 = text1.length / totalLength;
+
+            let duration1 = totalDuration * proportion1;
+            let duration2 = totalDuration * (1 - proportion1);
+
+            // Ensure minimum duration
+            if (duration1 < MIN_DURATION) {
+                duration1 = MIN_DURATION;
+                duration2 = totalDuration - MIN_DURATION;
+            }
+            if (duration2 < MIN_DURATION) {
+                duration2 = MIN_DURATION;
+                duration1 = totalDuration - MIN_DURATION;
+            }
+
+            const midSeconds = startSeconds + duration1;
+            const midTime = secondsToTime(midSeconds);
+
+            console.log(`  Time split: ${startTime} → ${midTime} → ${endTime}`);
+
+            // Update current row with first part
+            cells[1].textContent = startTime;
+            cells[2].textContent = midTime;
+            cells[3].innerHTML = text1.replace(/\n/g, '<br>');
+            cells[4].textContent = status;
+
+            // Remove highlights
+            row.classList.remove('longline-highlight');
+
+            // Insert new row for second part
+            const newRow = tableBody.insertRow(rowIndex + 1);
+            const newNumber = newRow.insertCell(0);
+            const newStart = newRow.insertCell(1);
+            const newEnd = newRow.insertCell(2);
+            const newText = newRow.insertCell(3);
+            const newStatus = newRow.insertCell(4);
+
+            newNumber.textContent = number; // Will be renumbered below
+            newStart.textContent = midTime;
+            newEnd.textContent = endTime;
+            newText.innerHTML = text2.replace(/\n/g, '<br>');
+            newStatus.textContent = status;
+            newStatus.className = 'cell-status';
+
+            // Renumber all subtitles
+            const allRows = tableBody.getElementsByTagName('tr');
+            for (let i = 0; i < allRows.length; i++) {
+                allRows[i].cells[0].textContent = i + 1;
+            }
+
+            // Update stats
+            document.getElementById('totalSubs').textContent = allRows.length.toLocaleString();
+
+            console.log('✅ Manual split completed');
+            showProcessingStatus('✅ Split complete!', `Subtitle divided into 2 entries`);
+            setTimeout(() => hideProcessingStatus(), 2000);
+
+            // Highlight the newly created rows
+            row.classList.add('highlight');
+            newRow.classList.add('highlight');
+            setTimeout(() => {
+                row.classList.remove('highlight');
+                newRow.classList.remove('highlight');
+            }, 2000);
+
+            // Reactivate edit mode event listeners if edit mode is active
+            if (editModeActive) {
+                reactivateEditModeListeners();
+            }
+        }
+
+        // ============================================
+        // EDIT MODE (INTERACTIVE MANUAL SPLIT)
+        // ============================================
+
+        /**
+         * Reactivate edit mode event listeners
+         * Called after table modifications to ensure edit mode continues working
+         */
+        function reactivateEditModeListeners() {
+            if (!editModeActive) return;
+
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.getElementsByTagName('tr');
+
+            // Add click event listeners to all text cells (including new ones)
+            for (let i = 0; i < rows.length; i++) {
+                const textCell = rows[i].cells[3];
+                if (textCell) {
+                    // Remove existing listener first to avoid duplicates
+                    textCell.removeEventListener('click', handleTextCellClickEditMode);
+                    // Add listener
+                    textCell.addEventListener('click', handleTextCellClickEditMode);
+                    textCell.style.userSelect = 'none';
+                }
+            }
+        }
+
+        /**
+         * Toggle edit mode on/off
+         * When active, allows clicking anywhere in text cells to split subtitles
+         */
+        function toggleEditMode() {
+            const button = document.getElementById('editModeButton');
+
+            if (editModeActive) {
+                // Deactivate edit mode
+                editModeActive = false;
+                button.classList.remove('active');
+                deactivateEditMode();
+                console.log('✏️ Edit mode deactivated');
+            } else {
+                // Activate edit mode
+                editModeActive = true;
+                button.classList.add('active');
+                activateEditMode();
+                console.log('✏️ Edit mode activated - Click on any text to split subtitle');
+            }
+        }
+
+        /**
+         * Activate edit mode - add click handlers to all text cells
+         */
+        function activateEditMode() {
+            const tableBody = document.getElementById('tableBody');
+            const table = tableBody.closest('table');
+
+            // Add edit mode class to table for cursor styling
+            table.classList.add('edit-mode-active');
+
+            // Add click event listeners to all text cells
+            const rows = tableBody.getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                const textCell = rows[i].cells[3];
+                if (textCell) {
+                    textCell.addEventListener('click', handleTextCellClickEditMode);
+                    textCell.style.userSelect = 'none'; // Prevent text selection during edit mode
+                }
+            }
+        }
+
+        /**
+         * Deactivate edit mode - remove click handlers and clean up
+         */
+        function deactivateEditMode() {
+            const tableBody = document.getElementById('tableBody');
+            const table = tableBody.closest('table');
+
+            // Remove edit mode class from table
+            table.classList.remove('edit-mode-active');
+
+            // Remove click event listeners from all text cells
+            const rows = tableBody.getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                const textCell = rows[i].cells[3];
+                if (textCell) {
+                    textCell.removeEventListener('click', handleTextCellClickEditMode);
+                    textCell.style.userSelect = ''; // Restore text selection
+                }
+            }
+
+            // Clean up any existing preview
+            cleanupSplitPreview();
+        }
+
+        /**
+         * Handle click on text cell in edit mode
+         */
+        function handleTextCellClickEditMode(event) {
+            if (!editModeActive) return;
+
+            const textCell = event.currentTarget;
+            const row = textCell.parentElement;
+
+            // Get full text without HTML
+            const fullText = textCell.innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+            if (fullText.length === 0) return;
+
+            // Store original HTML
+            const originalHTML = textCell.innerHTML;
+
+            // Temporarily set cell to plain text for accurate position detection
+            textCell.textContent = fullText;
+
+            // Get precise click position using browser API
+            let splitPosition = getClickPositionInText(event.clientX, event.clientY, textCell, fullText);
+
+            // Restore original HTML
+            textCell.innerHTML = originalHTML;
+
+            // Validate split position
+            splitPosition = Math.max(1, Math.min(fullText.length - 1, splitPosition));
+
+            console.log(`\n✏️ Edit mode click detected:`);
+            console.log(`  Row: ${row.rowIndex}`);
+            console.log(`  Text length: ${fullText.length}`);
+            console.log(`  Split position: ${splitPosition}`);
+            console.log(`  Click coordinates: (${event.clientX}, ${event.clientY})`);
+
+            // Show visual preview
+            showSplitPreview(row, fullText, splitPosition);
+        }
+
+        /**
+         * Get precise character position from click coordinates
+         * Uses browser APIs for accurate text position detection
+         */
+        function getClickPositionInText(clientX, clientY, element, fullText) {
+            let position = 0;
+
+            // Try caretRangeFromPoint (Chrome, Safari, Edge)
+            if (document.caretRangeFromPoint) {
+                const range = document.caretRangeFromPoint(clientX, clientY);
+                if (range) {
+                    position = range.startOffset;
+                    console.log(`  Using caretRangeFromPoint: offset=${position}`);
+                    return position;
+                }
+            }
+
+            // Try caretPositionFromPoint (Firefox)
+            if (document.caretPositionFromPoint) {
+                const caretPosition = document.caretPositionFromPoint(clientX, clientY);
+                if (caretPosition && caretPosition.offsetNode) {
+                    position = caretPosition.offset;
+                    console.log(`  Using caretPositionFromPoint: offset=${position}`);
+                    return position;
+                }
+            }
+
+            // Fallback: Use binary search with Range API
+            console.log(`  Using binary search fallback`);
+            const range = document.createRange();
+            const textNode = element.firstChild;
+
+            if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+                // Fallback to proportional calculation if no text node
+                const rect = element.getBoundingClientRect();
+                const clickX = clientX - rect.left;
+                const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                return Math.round(fullText.length * ratio);
+            }
+
+            let left = 0;
+            let right = fullText.length;
+            let bestPosition = 0;
+            let minDistance = Infinity;
+
+            // Binary search for closest character position
+            while (left <= right) {
+                const mid = Math.floor((left + right) / 2);
+
+                try {
+                    range.setStart(textNode, mid);
+                    range.setEnd(textNode, mid);
+                    const rect = range.getBoundingClientRect();
+                    const charX = rect.left;
+
+                    const distance = Math.abs(charX - clientX);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestPosition = mid;
+                    }
+
+                    if (charX < clientX) {
+                        left = mid + 1;
+                    } else {
+                        right = mid - 1;
+                    }
+                } catch (e) {
+                    // If range fails, use proportional fallback
+                    break;
+                }
+            }
+
+            return bestPosition;
+        }
+
+        /**
+         * Show visual preview of split with colored areas
+         */
+        function showSplitPreview(row, fullText, splitPosition) {
+            // Clean up any previous preview
+            cleanupSplitPreview();
+
+            const textCell = row.cells[3];
+
+            // Split text at position
+            const textBefore = fullText.substring(0, splitPosition).trim();
+            const textAfter = fullText.substring(splitPosition).trim();
+
+            if (!textBefore || !textAfter) {
+                alert('Split position would create empty subtitle. Please click elsewhere.');
+                return;
+            }
+
+            // Create colored preview HTML
+            const previewHTML = `<span class="split-preview-before">${textBefore}</span><span class="split-preview-after">${textAfter}</span>`;
+            textCell.innerHTML = previewHTML;
+
+            // Add highlight to row
+            row.classList.add('split-preview-row');
+
+            // Store preview data
+            currentSplitPreview = {
+                row: row,
+                fullText: fullText,
+                splitPosition: splitPosition,
+                textBefore: textBefore,
+                textAfter: textAfter
+            };
+
+            // Show confirmation dialog
+            showSplitDialog();
+        }
+
+        /**
+         * Show custom split confirmation dialog
+         */
+        function showSplitDialog() {
+            if (!currentSplitPreview) return;
+
+            const { textBefore, textAfter } = currentSplitPreview;
+
+            // Create dialog overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'split-dialog-overlay';
+            overlay.id = 'splitDialogOverlay';
+
+            // Create dialog content
+            overlay.innerHTML = `
+                <div class="split-dialog">
+                    <h3>✂️ Confirm Subtitle Split</h3>
+                    <p>Do you want to split this subtitle at the selected position?</p>
+
+                    <div class="split-dialog-preview">
+                        <div class="split-dialog-part before">
+                            <strong>🟢 BEFORE (${textBefore.length} chars)</strong>
+                            <div>"${textBefore.substring(0, 100)}${textBefore.length > 100 ? '...' : ''}"</div>
+                        </div>
+
+                        <div class="split-dialog-part after">
+                            <strong>🔵 AFTER (${textAfter.length} chars)</strong>
+                            <div>"${textAfter.substring(0, 100)}${textAfter.length > 100 ? '...' : ''}"</div>
+                        </div>
+                    </div>
+
+                    <div class="split-dialog-buttons">
+                        <button class="split-dialog-button cancel" onclick="cancelSplitDialog()">Cancel</button>
+                        <button class="split-dialog-button confirm" onclick="confirmSplitDialog()">Split Subtitle</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            // Add click outside to cancel
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    cancelSplitDialog();
+                }
+            });
+        }
+
+        /**
+         * Confirm and execute the split
+         */
+        function confirmSplitDialog() {
+            if (!currentSplitPreview) return;
+
+            const { row, fullText, splitPosition } = currentSplitPreview;
+
+            // Remove dialog
+            const overlay = document.getElementById('splitDialogOverlay');
+            if (overlay) {
+                overlay.remove();
+            }
+
+            // Clean up preview visuals BEFORE executing split
+            row.classList.remove('split-preview-row');
+
+            // Clear currentSplitPreview to prevent cleanup from restoring text
+            currentSplitPreview = null;
+
+            // Execute the split (this will update the cell text correctly)
+            splitSubtitleAtPosition(row, fullText, splitPosition);
+        }
+
+        /**
+         * Cancel split and clean up preview
+         */
+        function cancelSplitDialog() {
+            // Remove dialog
+            const overlay = document.getElementById('splitDialogOverlay');
+            if (overlay) {
+                overlay.remove();
+            }
+
+            // Restore original text
+            if (currentSplitPreview) {
+                const { row, fullText } = currentSplitPreview;
+                const textCell = row.cells[3];
+                textCell.innerHTML = fullText.replace(/\n/g, '<br>');
+                row.classList.remove('split-preview-row');
+            }
+
+            // Clean up preview data
+            currentSplitPreview = null;
+        }
+
+        /**
+         * Clean up any existing split preview
+         */
+        function cleanupSplitPreview() {
+            if (currentSplitPreview) {
+                const { row, fullText } = currentSplitPreview;
+                const textCell = row.cells[3];
+                textCell.innerHTML = fullText.replace(/\n/g, '<br>');
+                row.classList.remove('split-preview-row');
+                currentSplitPreview = null;
+            }
+
+            // Remove dialog if exists
+            const overlay = document.getElementById('splitDialogOverlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+
+        // ============================================
+        // LANGUAGE SELECTOR
+        // ============================================
+
+        /**
+         * Change the page language attribute and activate Google Translate
+         * Updates document.documentElement.lang to help Google Translator detect the correct base language
+         */
+        function changePageLanguage() {
+            const selectedLang = document.getElementById('pageLanguage').value;
+            document.documentElement.lang = selectedLang;
+            console.log(`✓ Page language changed to: ${selectedLang}`);
+
+            // Save preference to localStorage
+            localStorage.setItem('pageLanguage', selectedLang);
+
+            // Trigger Google Translate programmatically
+            triggerGoogleTranslate(selectedLang);
+        }
+
+        /**
+         * Attempt to programmatically trigger Google Translate to the selected language
+         * This function tries to manipulate the Google Translate widget to activate translation
+         */
+        function triggerGoogleTranslate(targetLang) {
+            // Wait for Google Translate to be fully loaded
+            setTimeout(() => {
+                try {
+                    // Try to find the Google Translate select element
+                    const gtSelect = document.querySelector('.goog-te-combo');
+                    if (gtSelect) {
+                        // Set the value to target language
+                        gtSelect.value = targetLang;
+
+                        // Trigger change event to activate translation
+                        const event = new Event('change', { bubbles: true });
+                        gtSelect.dispatchEvent(event);
+
+                        console.log(`🌐 Google Translate activated for language: ${targetLang}`);
+                    } else {
+                        console.warn('⚠️ Google Translate widget not found yet. Please use the widget manually or try again.');
+                    }
+                } catch (error) {
+                    console.error('❌ Error activating Google Translate:', error);
+                    console.log('💡 Tip: You can use the Google Translate widget above manually.');
+                }
+            }, 1000); // Wait 1 second for widget to be ready
+        }
+
+        // Restore saved language preference on page load
+        (function() {
+            const savedLang = localStorage.getItem('pageLanguage');
+            if (savedLang) {
+                const languageSelector = document.getElementById('pageLanguage');
+                if (languageSelector) {
+                    languageSelector.value = savedLang;
+                    document.documentElement.lang = savedLang;
+                    console.log(`✓ Restored language preference: ${savedLang}`);
+                }
+            }
+        })();
+
+        // ============================================
+        // TESTING FUNCTIONS
+        // ============================================
+
+        /**
+         * Test the split algorithm with a specific text
+         * Usage in console: testSplitAlgorithm("your text here", 100)
+         */
+        window.testSplitAlgorithm = function(text, maxLength = 200) {
+            console.log('\n' + '='.repeat(80));
+            console.log('🧪 TESTING SPLIT ALGORITHM');
+            console.log('='.repeat(80));
+            console.log(`Text length: ${text.length} characters`);
+            console.log(`MAX_LENGTH: ${maxLength}`);
+            console.log(`Text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
+            console.log('-'.repeat(80));
+
+            const subordinateWords = [
+                // German (removed: was, die, das, als, den - these will be checked with comma prefix)
+                'weil', 'wenn', 'dass', 'ob', 'damit', 'obwohl', 'bevor', 'nachdem',
+                'während', 'sobald', 'und', 'aber', 'oder', 'denn', 'sondern', 'ok', 'okay',
+                'auch', 'deswegen', 'also', 'wie', 'dann', 'wo',
+                'que', 'porque', 'cuando', 'si', 'aunque', 'mientras', 'después', 'antes',
+                'para que', 'ya que', 'pero', 'sino', 'o', 'y', 'ok', 'okey',
+                'that', 'because', 'when', 'if', 'although', 'while', 'after', 'before',
+                'since', 'unless', 'until', 'but', 'or', 'and', 'yet', 'ok', 'okay', 'okey'
+            ];
+
+            const commaRequiredWords = [
+                'was', 'die', 'das', 'als', 'den'
+            ];
+
+            const personalPronouns = [
+                'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'Sie',
+                'yo', 'tú', 'él', 'ella', 'usted', 'nosotros', 'nosotras', 'vosotros', 'vosotras', 'ellos', 'ellas', 'ustedes',
+                'i', 'you', 'he', 'she', 'it', 'we', 'they'
+            ];
+
+            const chunks = [];
+            let remainingText = text;
+            let iteration = 0;
+
+            while (remainingText.length > maxLength) {
+                iteration++;
+                console.log(`\nIteration ${iteration}: Processing ${remainingText.length} chars`);
+
+                let splitPoint = -1;
+                let strategy = '';
+
+                // BACKWARD SEARCH
+                console.log(`  Searching BACKWARD (${maxLength} → ${Math.floor(maxLength * 0.25)})...`);
+
+                // Strategy 1A: Sentence terminator backward
+                for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                    if (/[.!?]/.test(remainingText[j])) {
+                        splitPoint = j + 1;
+                        strategy = 'sentence terminator (backward)';
+                        break;
+                    }
+                }
+
+                // Strategy 1.5A: Comma + pronoun backward
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                        if (remainingText[j] === ',') {
+                            const afterComma = remainingText.substring(j + 1).trimStart();
+                            const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                            if (personalPronouns.includes(wordAfterComma)) {
+                                splitPoint = j + 1;
+                                strategy = `comma + pronoun "${wordAfterComma}" (backward)`;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 2A: Subordinate word backward
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                        if (remainingText[j] === ' ') {
+                            const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
+                            if (subordinateWords.includes(wordAfter)) {
+                                splitPoint = j + 1;
+                                strategy = `subordinate word "${wordAfter}" (backward)`;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 2.5A: Comma + comma-required word backward
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= maxLength * 0.25; j--) {
+                        if (remainingText[j] === ',') {
+                            const afterComma = remainingText.substring(j + 1).trimStart();
+                            const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                            if (commaRequiredWords.includes(wordAfterComma)) {
+                                splitPoint = j + 1;
+                                strategy = `comma + word "${wordAfterComma}" (backward)`;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // FORWARD SEARCH
+                if (splitPoint === -1) {
+                    console.log(`  No split point found backward, searching FORWARD...`);
+
+                    // Strategy 1B: Sentence terminator forward
+                    // Limit search to 2x maxLength to avoid finding terminators too far away
+                    const maxSearchDistance = Math.min(remainingText.length, maxLength * 2);
+                    console.log(`  Forward search range: ${maxLength} → ${maxSearchDistance}`);
+
+                    for (let j = maxLength; j < maxSearchDistance; j++) {
+                        if (/[.!?]/.test(remainingText[j])) {
+                            splitPoint = j + 1;
+                            strategy = 'sentence terminator (forward)';
+                            break;
+                        }
+                    }
+
+                    // Strategy 1.5B: Comma + pronoun forward (limited range)
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ',') {
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (personalPronouns.includes(wordAfterComma)) {
+                                    splitPoint = j + 1;
+                                    strategy = `comma + pronoun "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2B: Subordinate word forward (limited range)
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ' ') {
+                                const wordAfter = remainingText.substring(j + 1).split(/\s+/)[0].toLowerCase();
+                                if (subordinateWords.includes(wordAfter)) {
+                                    splitPoint = j + 1;
+                                    strategy = `subordinate word "${wordAfter}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2.25B: Comma + comma-required word forward (limited range)
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < maxSearchDistance; j++) {
+                            if (remainingText[j] === ',') {
+                                const afterComma = remainingText.substring(j + 1).trimStart();
+                                const wordAfterComma = afterComma.split(/\s+/)[0].toLowerCase();
+                                if (commaRequiredWords.includes(wordAfterComma)) {
+                                    splitPoint = j + 1;
+                                    strategy = `comma + word "${wordAfterComma}" (forward)`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 2.5B: Any comma forward
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < remainingText.length; j++) {
+                            if (remainingText[j] === ',') {
+                                splitPoint = j + 1;
+                                strategy = 'any comma (forward)';
+                                break;
+                            }
+                        }
+                    }
+
+                    // Strategy 3B: First space forward
+                    if (splitPoint === -1) {
+                        for (let j = maxLength; j < remainingText.length; j++) {
+                            if (remainingText[j] === ' ') {
+                                splitPoint = j + 1;
+                                strategy = 'first space (forward)';
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 4: Search BACKWARDS for any space (to avoid splitting mid-word)
+                if (splitPoint === -1) {
+                    for (let j = Math.min(maxLength, remainingText.length - 1); j >= 0; j--) {
+                        if (remainingText[j] === ' ') {
+                            splitPoint = j + 1;
+                            strategy = 'any space (backward from MAX_LENGTH)';
+                            break;
+                        }
+                    }
+                }
+
+                // Strategy 5: Absolute last resort - force split
+                if (splitPoint === -1) {
+                    console.warn(`⚠️ WARNING: No spaces found! Forcing split at MAX_LENGTH`);
+                    splitPoint = maxLength;
+                    strategy = 'force at MAX_LENGTH (NO SPACES FOUND)';
+                }
+
+                const chunk = remainingText.substring(0, splitPoint).trim();
+                console.log(`  ✓ Split at position ${splitPoint} using: ${strategy}`);
+                console.log(`  ✓ Chunk ${iteration} length: ${chunk.length} chars`);
+                console.log(`  ✓ Preview: "${chunk.substring(0, 60)}${chunk.length > 60 ? '...' : ''}"`);
+
+                chunks.push(chunk);
+                remainingText = remainingText.substring(splitPoint).trim();
+            }
+
+            // Add remaining text
+            if (remainingText.length > 0) {
+                chunks.push(remainingText);
+                console.log(`\n✓ Final chunk: ${remainingText.length} chars`);
+            }
+
+            console.log('\n' + '='.repeat(80));
+            console.log(`✅ RESULT: Split into ${chunks.length} chunks`);
+            console.log('='.repeat(80));
+            chunks.forEach((chunk, idx) => {
+                console.log(`Chunk ${idx + 1} (${chunk.length} chars): "${chunk.substring(0, 80)}${chunk.length > 80 ? '...' : ''}"`);
+            });
+            console.log('='.repeat(80) + '\n');
+
+            return chunks;
+        };
+
+        console.log('✅ Test function loaded. Use: testSplitAlgorithm("your text", 100)');
+    </script>
+</body>
+</html>
