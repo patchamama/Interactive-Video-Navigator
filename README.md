@@ -1,5 +1,7 @@
 El objetivo de este proyecto es crear varias aplicaciones/herramientas relacionadas con videos, subtitulos, que permitan el trabajo con videos y audiovisuales, y soluciones a problemas frecuentes en relación a estos.
 
+Deployment: https://patchamama.github.io/Interactive-Video-Navigator/
+
 ### Herramientas Scripts
 
 - 1. [Traductor de Subtitulos usando traductores de navegador como gTranslator y Bing](./subtitles.show.html). Para que funcione, es necesario correr un servidor local como `php -s localhost:8000` o `python3 -m http.server 8000`
