@@ -1623,9 +1623,13 @@
             
             console.log(`✅ Reduced from ${subtitles.length} to ${improved.length} subtitles`);
             updateProcessingStatus('✅ YouTube improvement complete!', `Reduced from ${subtitles.length} to ${improved.length} subtitles`);
+
+            // Fix overlapping times after improvement
+            const fixed = fixOverlappingTimes(improved);
+
             setTimeout(() => hideProcessingStatus(), 2000);
-            
-            return improved;
+
+            return fixed;
         }
 
         function reprocessSubtitles() {
@@ -1643,6 +1647,10 @@
                 if (isYouTubeCleanerActive()) {
                     processedSubs = improveYouTubeSubtitles(processedSubs);
                 } else {
+                    // If Fix Loss Times is active but YouTube Cleaner is not, still fix overlapping times
+                    if (isFixLossTimesActive()) {
+                        processedSubs = fixOverlappingTimes(processedSubs);
+                    }
                     hideProcessingStatus();
                 }
 
@@ -1692,10 +1700,13 @@
         function toggleFixLossTimes() {
             const button = document.getElementById('fixLossTimesButton');
             button.classList.toggle('active');
-            // This only affects the joinSentences() function behavior
-            // If join sentences is active, reapply it
+
+            // Reprocess subtitles to apply or remove time fixing
+            // This affects both the overlapping times fix and joinSentences() function behavior
             if (document.getElementById('joinSentencesButton').classList.contains('active')) {
                 handleJoinSentences();
+            } else {
+                reprocessSubtitles();
             }
         }
 
@@ -1825,6 +1836,43 @@
             const mmm = String(milliseconds).padStart(3, '0');
 
             return `${hh}:${mm}:${ss},${mmm}`;
+        }
+
+        /**
+         * Fix overlapping subtitle times
+         * When a subtitle's end time is greater than the next subtitle's start time,
+         * adjust the end time to match the next subtitle's start time
+         */
+        function fixOverlappingTimes(subtitles) {
+            if (!subtitles || subtitles.length === 0) return subtitles;
+
+            console.log('🔧 Fixing overlapping subtitle times...');
+            let fixedCount = 0;
+
+            for (let i = 0; i < subtitles.length - 1; i++) {
+                const current = subtitles[i];
+                const next = subtitles[i + 1];
+
+                const currentEndSeconds = timeToSeconds(current.endTime);
+                const nextStartSeconds = timeToSeconds(next.startTime);
+
+                // If current end time is after next start time, fix it
+                if (currentEndSeconds > nextStartSeconds) {
+                    const oldEndTime = current.endTime;
+                    current.endTime = next.startTime;
+                    fixedCount++;
+
+                    console.log(`  ✓ Fixed subtitle ${current.number}: ${oldEndTime} → ${current.endTime} (next starts at ${next.startTime})`);
+                }
+            }
+
+            if (fixedCount > 0) {
+                console.log(`✅ Fixed ${fixedCount} overlapping subtitle times`);
+            } else {
+                console.log('✅ No overlapping times found');
+            }
+
+            return subtitles;
         }
 
         function joinSentences() {
