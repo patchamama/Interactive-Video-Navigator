@@ -1764,6 +1764,11 @@
                 return;
             }
 
+            // Renumber subtitles sequentially before displaying
+            subtitles.forEach((sub, index) => {
+                sub.number = index + 1;
+            });
+
             subtitles.forEach(sub => {
                 const row = tbody.insertRow();
 
@@ -2211,6 +2216,11 @@
                 console.log('\n⚠️ Fix Loss Times is disabled - skipping post-processing');
             }
 
+            // Renumber all subtitles sequentially before displaying
+            finalJoined.forEach((sub, index) => {
+                sub.number = index + 1;
+            });
+
             // Clear table and display joined subtitles
             tableBody.innerHTML = '';
 
@@ -2557,6 +2567,11 @@
             }
 
             console.log(`✅ Split complete - ${subtitles.length} → ${split.length} subtitles`);
+
+            // Renumber all subtitles sequentially before displaying
+            split.forEach((sub, index) => {
+                sub.number = index + 1;
+            });
 
             // Clear table and display split subtitles
             tableBody.innerHTML = '';
